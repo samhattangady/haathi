@@ -8,7 +8,7 @@
 const std = @import("std");
 const c = @import("c.zig");
 const font_path = "fonts/JetBrainsMono/ttf/JetBrainsMono-Light.ttf";
-const out_path = "font_data.json";
+const out_path = "C:/Users/user/Antgineering/data/font_data.json";
 
 const FONT_TEX_WIDTH = 512;
 const FONT_TEX_HEIGHT = 512;
@@ -67,6 +67,7 @@ pub fn main() !void {
     for (START_CODEPOINT..END_CODEPOINT) |codepoint| {
         var bmp: BitmapData = undefined;
         bmp.data = c.stbtt_GetCodepointBitmap(&font_info, scale, scale, @intCast(i32, codepoint), &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
+        // bmp.data = c.stbtt_GetCodepointSDF(&font_info, scale, @intCast(i32, codepoint), 1, 1, 1, &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
         var advance: i32 = undefined;
         c.stbtt_GetCodepointHMetrics(&font_info, @intCast(i32, codepoint), &advance, 0);
         bmp.xadvance = @intToFloat(f32, advance) * scale;
@@ -87,7 +88,6 @@ pub fn main() !void {
             .y = 0,
             .was_packed = 0,
         }) catch unreachable;
-        // // defer c.stbtt_FreeBitmap(char_bitmap, null);
     }
     {
         // TODO (10 May 2023 sam): This needs to be run multiple times to find the best texture map size.
@@ -97,8 +97,7 @@ pub fn main() !void {
         for (0..rects.items.len) |_| {
             nodes.append(undefined) catch unreachable;
         }
-        var packer = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @intCast(i32, nodes.items.len));
-        _ = packer;
+        _ = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @intCast(i32, nodes.items.len));
         var was_packed = c.stbrp_pack_rects(&packer_context, &rects.items[0], @intCast(i32, rects.items.len));
         if (was_packed == 0) std.debug.print("Could not pack rects \n", .{});
     }
@@ -113,6 +112,7 @@ pub fn main() !void {
         const width = rect.w;
         const height = rect.h;
         const char_bitmap = bitmaps.get(@intCast(usize, rect.id)).?.data;
+        defer c.stbtt_FreeBitmap(char_bitmap, null);
         var y: usize = 0;
         while (y < height - PADDING) : (y += 1) {
             var x: usize = 0;
