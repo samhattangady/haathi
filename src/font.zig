@@ -7,7 +7,7 @@
 
 const std = @import("std");
 const c = @import("c.zig");
-const font_path = "fonts/JetBrainsMono/ttf/JetBrainsMono-Light.ttf";
+const font_path = "fonts/JetBrainsMono/ttf/JetBrainsMono-Regular.ttf";
 const out_path = "C:/Users/user/Antgineering/data/font_data.json";
 
 const FONT_TEX_WIDTH = 512;
