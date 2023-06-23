@@ -1,2 +1,2 @@
 @echo off
-call timecmd current_zig build %* && current_zig build %* run
+call timecmd current_zig build %* -Dfont_builder=true && current_zig build %* -Dfont_builder=true run

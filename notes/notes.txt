@@ -1,0 +1,43 @@
+23 Jun 2023:
+Today is the first day of the project. Mostly it will end up setting up a
+bunch of things. I don't really have much of an engine in place, so I think
+the main focus for the day would be to set that up.
+
+So I want to have the following things, all running in browser.
+- Draw textured triangles (this will cover fonts as well) across user defined
+  layers.
+- Recieve mouse and keyboard inputs.
+- Load files, and write to html5memory.
+- Play sounds.
+
+I have done some of these things before, with the KCPS port, but this time I
+want it to be a little cleaner. I think instead of using webgl, I would like
+to use web canvas, and see how that works. I don't know how well that would
+deal with textured triangles and things, but it might be the simplest way to
+get things started.
+
+So going through the Canvas API, it seems that it has some pretty good support
+for shapes and things, which we should take full advantage of. Eventually we
+might want to target other platforms as well, but that is all a problem for
+later. For now, we should just focus on making the best / simplest API across
+zig and WASM.
+
+I also want to keep some of the things that we learned from dragonruby. We
+always want the final canvas to be of 1280x720. If the screen is larger or
+smaller, let the renderer handle the scaling and things. For the sake of the
+engine itself, it always considers that resolution, and so it can use that in
+all the cases where it is necessary.
+
+Step 1:
+Set up a basic app, where we are drawing a square to the canvas. When space is
+held down, the square changes to one colour. When mouse is held down, it
+changes to another color. That's all. And also set up the build and things to
+make it easy to run.
+
+I think the focus should be on just working on this project for now. Forget
+about the engine overall. We can slowly factor out the things that need to be
+common. For now we should be fine just as is.
+
+I am having some problems with WASM. When I import the wasm file, it doesn't
+seem to have the functions that were exported from zig. This needs to be
+fixed.
