@@ -41,3 +41,21 @@ common. For now we should be fine just as is.
 I am having some problems with WASM. When I import the wasm file, it doesn't
 seem to have the functions that were exported from zig. This needs to be
 fixed.
+
+It seems like it was some issue with the build options, which has been changed
+since all the public examples were posted...
+
+---
+
+The supported behaviour for inputs in web is that they pass a string with the
+name of the key. That's not ideal to pass back into zig. So we probably should
+be convert to a number in js itself? But it will be important to make sure
+that the two are kept in sync.
+
+---
+
+Cool, now we have all the basic things passing through easily. That initial
+POC stuff is done. I think we can stop here for today.
+The next thing to work on would be to figure out where the game code goes, and
+how much should go into main. Ideally, it should be as low as possible, but I
+guess that's not fully in our hands. But lets try =).

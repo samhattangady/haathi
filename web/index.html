@@ -20,45 +20,32 @@
 
   <script>
     const env = { ...api };
-    // document.addEventListener('contextmenu', event => event.preventDefault());
+    document.addEventListener('contextmenu', event => event.preventDefault());
 
-    // fetchAndInstantiate('synthelligence.wasm', { env }).then(instance => {
-    //   memory = instance.exports.memory;
-    //   console.log(instance);
-    //   instance.exports.onInit();
-    //   const zig_render = instance.exports.render;
-    //   // document.addEventListener('keydown', e => instance.exports.key_down(e.keyCode));
-    //   // document.addEventListener('keyup', e => instance.exports.key_up(e.keyCode));
-    //   // document.addEventListener('mousedown', e => instance.exports.mouse_down(e.button));
-    //   // document.addEventListener('mouseup', e => instance.exports.mouse_up(e.button));
-    //   // document.addEventListener('mousemove', e => instance.exports.mouse_motion(e.x, e.y));
+    fetchAndInstantiate('synthelligence.wasm', { env }).then(instance => {
+      memory = instance.exports.memory;
+      console.log(instance);
+      instance.exports.init();
+      const zig_render = instance.exports.render;
+      document.addEventListener('keydown', e => instance.exports.key_down(getKeycode(e.key)));
+      document.addEventListener('keyup', e => instance.exports.key_up(getKeycode(e.key)));
+      document.addEventListener('mousedown', e => instance.exports.mouse_down(e.button));
+      document.addEventListener('mouseup', e => instance.exports.mouse_up(e.button));
+      document.addEventListener('mousemove', e => instance.exports.mouse_motion(e.x, e.y));
 
-    //   function render() {
-    //     zig_render();
-    //     window.requestAnimationFrame(render);
-    //   }
-    //   window.requestAnimationFrame(render);
-    // });
-
-    // function fetchAndInstantiate(url, importObject) {
-    //   return fetch(url)
-    //     .then(response => response.arrayBuffer())
-    //     .then(bytes => WebAssembly.instantiate(bytes, importObject))
-    //     .then(results => results.instance);
-    // }
-
-   const importObject = {
-        imports: {
-          imported_func: arg => {
-            console.log(arg);
-          }
-        }
-      };
-    WebAssembly.instantiateStreaming(fetch("synthelligence.wasm"), importObject)
-    .then(obj => {
-      console.log(obj);
-      obj.instance.exports.init();
+      function render() {
+        zig_render();
+        window.requestAnimationFrame(render);
+      }
+      window.requestAnimationFrame(render);
     });
+
+    function fetchAndInstantiate(url, importObject) {
+      return fetch(url)
+        .then(response => response.arrayBuffer())
+        .then(bytes => WebAssembly.instantiate(bytes, importObject))
+        .then(results => results.instance);
+    }
 
   </script>
 

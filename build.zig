@@ -37,5 +37,7 @@ fn synth_builder(b: *std.build.Builder) void {
         .optimize = optimize,
     });
     exe.addSystemIncludePath("src");
+    exe.rdynamic = true;
+    // b.default_step.dependOn(&exe.step);
     b.installArtifact(exe);
 }
