@@ -7,8 +7,8 @@ pub const Vec2 = struct {
 
     pub fn fromInts(x: anytype, y: anytype) Vec2 {
         return Vec2{
-            .x = @intToFloat(f32, x),
-            .y = @intToFloat(f32, y),
+            .x = @floatFromInt(f32, x),
+            .y = @floatFromInt(f32, y),
         };
     }
 
@@ -86,8 +86,8 @@ pub const Vec2 = struct {
 
     pub fn round(v: *const Self) Vec2i {
         return .{
-            .x = @floatToInt(i32, @round(v.x)),
-            .y = @floatToInt(i32, @round(v.y)),
+            .x = @intFromFloat(i32, @round(v.x)),
+            .y = @intFromFloat(i32, @round(v.y)),
         };
     }
 
@@ -114,8 +114,8 @@ pub const Vec2i = struct {
 
     pub fn toVec2(v: *const Self) Vec2 {
         return .{
-            .x = @intToFloat(f32, v.x),
-            .y = @intToFloat(f32, v.y),
+            .x = @floatFromInt(f32, v.x),
+            .y = @floatFromInt(f32, v.y),
         };
     }
 
@@ -154,10 +154,10 @@ pub const Vec4 = struct {
         std.debug.assert(hex[0] == '#'); // hex_rgba needs to be in "#rrggbbaa" format
         std.debug.assert(hex.len == 9); // hex_rgba needs to be in "#rrggbbaa" format
         var self = Vec4{};
-        self.x = @intToFloat(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
-        self.y = @intToFloat(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
-        self.z = @intToFloat(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
-        self.w = @intToFloat(f32, std.fmt.parseInt(u8, hex[7..9], 16) catch unreachable) / 255.0;
+        self.x = @floatFromInt(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
+        self.y = @floatFromInt(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
+        self.z = @floatFromInt(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
+        self.w = @floatFromInt(f32, std.fmt.parseInt(u8, hex[7..9], 16) catch unreachable) / 255.0;
         return self;
     }
 
@@ -166,9 +166,9 @@ pub const Vec4 = struct {
         std.debug.assert(hex[0] == '#'); // hex_rgba needs to be in "#rrggbb" format
         std.debug.assert(hex.len == 7); // hex_rgba needs to be in "#rrggbb" format
         var self = Vec4{};
-        self.x = @intToFloat(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
-        self.y = @intToFloat(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
-        self.z = @intToFloat(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
+        self.x = @floatFromInt(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
+        self.y = @floatFromInt(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
+        self.z = @floatFromInt(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
         self.w = 1.0;
         return self;
     }

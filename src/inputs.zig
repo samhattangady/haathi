@@ -73,11 +73,11 @@ const Key = enum {
         comptime std.debug.assert(@typeInfo(@TypeOf(val)) == .Int);
         if (val < 0) return .not_supported;
         if (val >= @typeInfo(Self).Enum.fields.len) return .not_supported;
-        return @intToEnum(Self, val);
+        return std.meta.intToEnum(Self, val) catch unreachable;
     }
 
     pub fn toInt(key: *const Self) usize {
-        return @enumToInt(key.*);
+        return @intFromEnum(key.*);
     }
 };
 const NUM_KEYS = @typeInfo(Key).Enum.fields.len;
