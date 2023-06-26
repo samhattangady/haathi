@@ -76,3 +76,50 @@ So lets draw the target wave first. Let it be a sine wave.
 
 Okay, we have the basic of that thing rendering. Lets commit before we
 proceed.
+
+I am interested in trying out a breadboard based design for the wiring up of
+the circuit. I think that might be cool. Then we can pick and place components
+onto that, and it will do the things. But I think that comes a little bit
+later. There is a lot more work that we need to get done with before we can
+reach that stage.
+
+The main thing that we need to figure out is how to pass around the data. In
+my head it feels like that it is similar to a node-based programming system
+like a blender or whatever. So that would probably be the structure as well?
+
+What we want is to support each component having multiple outputs, and a fixed
+set of inputs (like min will have to have atleast 2 inputs to even make
+sense). I wonder whether that would make the breadboard idea better or
+worse...
+Also maybe breadboard doesn't make too much sense, because it becomes very
+easy to short-circuit I think.
+
+Okay, lets forget all of that for now. We have a much bigger question that
+still needs to be answered. How exactly wre we going to be doing the
+calculations. Maybe we just take one value, and then pass it down the whole
+chain, and come out with another value at the other end. But there will be
+branches and guys will have to wait for other branches to complete and things
+like that. But we can just do basic depth-first or breadth first, either way
+should be fine. Basically keep iterating through all the components until all
+of them have been solved.
+
+What is an easy way that we can test this all out though? Especially if we
+want something like a frequency modulator? Lets start out with a basic set of
+components.
+
+- Source
+- ~Double Frequency~ Source with 2x frequency.
+- Half Amplitude
+- Min
+
+For example, if someone decides to put a frequency modulator at a later stage,
+then I don't even know what the best way of thinking of that would even be.
+Because at that point, we are trying to literally look forward/backward in
+time. So maybe frequency modulation should not be allowed.
+
+Yeah okay. I think that makes some modicum of sense. Maybe we can also just
+allow rightwards connections? That also should be a decent thing.
+
+Damn. Its a little complicated to figure out the smallest part of this to
+build. But yeah, that's now pushed to tomorrow. Decent progress overall I
+guess.

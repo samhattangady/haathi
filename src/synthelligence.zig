@@ -41,10 +41,10 @@ pub const Game = struct {
     }
 
     pub fn render(self: *Self) void {
-        const box_pos = Vec2{ .x = 1280 - 310, .y = 10 };
-        const box_size = Vec2{ .x = 300, .y = 200 };
-        self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base2, .radius = 10 });
         const padding: f32 = 10;
+        const box_size = Vec2{ .x = 300, .y = 200 };
+        const box_pos = Vec2{ .x = 1280 - (padding + box_size.x), .y = padding };
+        self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base2, .radius = 10 });
         var points = std.ArrayList(Vec2).init(self.arena);
         for (self.target_points.items, 0..) |point, i| {
             const x = box_pos.x + padding + @floatFromInt(f32, i) / @floatFromInt(f32, self.target_points.items.len) * (box_size.x - padding * 2);
@@ -53,4 +53,26 @@ pub const Game = struct {
         }
         self.haathi.drawPath(.{ .points = points.items, .color = colors.solarized_base1 });
     }
+};
+
+const ComponentType = enum {
+    source_third,
+    source_half,
+    source_one,
+    source_two,
+    source_three,
+    min,
+    max,
+    scale_half,
+    scale_double,
+    display_main,
+};
+
+pub const Component = struct {
+    const Self = @This();
+    type: ComponentType,
+    roots_memory: [8]u8,
+    stems_memory: [8]u8,
+    roots: []u8,
+    stems: []u8,
 };

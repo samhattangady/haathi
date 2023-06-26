@@ -135,7 +135,7 @@ const stroke = () => {
   ctx.stroke();
 }
 
-const ellipse = (x, y, radius_x, radius_y, rotation, start_angle, end_angle, counter_clockwise) = {
+const ellipse = (x, y, radius_x, radius_y, rotation, start_angle, end_angle, counter_clockwise) => {
   ctx.ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle);
 }
 
