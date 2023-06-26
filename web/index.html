@@ -24,9 +24,7 @@
 
     fetchAndInstantiate('synthelligence.wasm', { env }).then(instance => {
       memory = instance.exports.memory;
-      console.log(instance);
       instance.exports.init();
-      const zig_render = instance.exports.render;
       document.addEventListener('keydown', e => instance.exports.keyDown(getKeycode(e.key)));
       document.addEventListener('keyup', e => instance.exports.keyUp(getKeycode(e.key)));
       document.addEventListener('mousedown', e => instance.exports.mouseDown(e.button));
@@ -34,7 +32,7 @@
       document.addEventListener('mousemove', e => instance.exports.mouseMove(e.x, e.y));
 
       function render() {
-        zig_render();
+        instance.exports.render();
         window.requestAnimationFrame(render);
       }
       window.requestAnimationFrame(render);

@@ -1,0 +1,1 @@
+[ ] Figure out anti-aliasing for the paths. They're all really jagged now. =/

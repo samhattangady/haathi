@@ -99,7 +99,7 @@ pub fn main() !void {
         }
         _ = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @intCast(i32, nodes.items.len));
         var was_packed = c.stbrp_pack_rects(&packer_context, &rects.items[0], @intCast(i32, rects.items.len));
-        if (was_packed == 0) std.debug.print("Could not pack rects \n", .{});
+        if (was_packed == 0) {}//std.debug.print("Could not pack rects \n", .{});
     }
     var font_bitmap = gpa.allocator().alloc(u8, FONT_TEX_WIDTH * FONT_TEX_HEIGHT) catch unreachable;
     defer gpa.allocator().free(font_bitmap);

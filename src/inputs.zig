@@ -113,7 +113,6 @@ pub const Inputs = struct {
     }
 
     pub fn handleKeyDown(self: *Self, code: u32, ticks: u64) void {
-        c.debugPrint(@tagName(Key.fromInt(code)).ptr);
         self.getKey(Key.fromInt(code)).setDown(ticks);
         self.getKey(.any_key).setDown(ticks);
     }

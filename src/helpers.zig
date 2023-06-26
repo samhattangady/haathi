@@ -1,4 +1,5 @@
 const std = @import("std");
+const c = @import("interface.zig");
 
 pub const Vec2 = struct {
     const Self = @This();
@@ -144,6 +145,7 @@ pub const Vec3 = struct {
 };
 
 pub const Vec4 = struct {
+    const Self = @This();
     x: f32 = 0,
     y: f32 = 0,
     z: f32 = 0,
@@ -173,6 +175,16 @@ pub const Vec4 = struct {
         return self;
     }
 
+    pub fn toHexRgba(self: *const Self, buffer: []u8) void {
+        std.debug.assert(buffer.len >= 10);
+        buffer[0] = '#';
+        buffer[9] = 0;
+        _ = std.fmt.bufPrint(buffer[1..9], "{x:0>2}", .{@intFromFloat(u8, self.x * 255)}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[3..5], "{x:0>2}", .{@intFromFloat(u8, self.y * 255)}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[5..7], "{x:0>2}", .{@intFromFloat(u8, self.z * 255)}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[7..9], "{x:0>2}", .{@intFromFloat(u8, self.w * 255)}) catch unreachable;
+    }
+
     pub fn alpha(self: *const Vec4, a: f32) Vec4 {
         var col = self.*;
         col.w = a;
@@ -185,4 +197,8 @@ pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
     // t goes between 0 and 1.
     const x = t * t * (3.0 - (2.0 * t));
     return start + ((end - start) * x);
+}
+
+pub fn milliTimestamp() u64 {
+    return @intCast(u64, c.milliTimestamp());
 }

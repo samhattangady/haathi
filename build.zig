@@ -32,7 +32,7 @@ fn synth_builder(b: *std.build.Builder) void {
     const optimize = b.standardOptimizeOption(.{});
     const exe = b.addSharedLibrary(.{
         .name = "synthelligence",
-        .root_source_file = .{ .path = "src/synthelligence.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });

@@ -82,11 +82,6 @@ const wasmString = (ptr) => {
   return str;
 }
 
-const fillRect = (x, y, width, height, color) => {
-  ctx.fillStyle = wasmString(color);
-  ctx.fillRect(x, y, width, height);
-}
-
 const clearCanvas = (color) => {
   ctx.fillStyle = wasmString(color);
   ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -96,8 +91,67 @@ const debugPrint = (ptr) => {
   console.log(wasmString(ptr));
 }
 
+const milliTimestamp = () => {
+  return BigInt(Date.now());
+}
+
+const fillRect = (x, y, width, height) => {
+  ctx.fillRect(x, y, width, height);
+}
+
+const roundRect = (x, y, width, height, radius) => {
+  ctx.roundRect(x, y, width, height, radius);
+}
+
+const fillStyle = (color) => {
+  ctx.fillStyle = wasmString(color);
+}
+
+const strokeStyle = (color) => {
+  ctx.strokeStyle = wasmString(color);
+}
+
+const lineWidth = (width) => {
+  ctx.lineWidth = width;
+}
+
+const beginPath = () => {
+  ctx.beginPath();
+}
+
+const moveTo = (x, y) => {
+  ctx.moveTo(x, y);
+}
+
+const lineTo = (x, y) => {
+  ctx.lineTo(x, y);
+}
+
+const fill = () => {
+  ctx.fill();
+}
+
+const stroke = () => {
+  ctx.stroke();
+}
+
+const ellipse = (x, y, radius_x, radius_y, rotation, start_angle, end_angle, counter_clockwise) = {
+  ctx.ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle);
+}
+
 var api = {
   fillRect,
+  roundRect,
   clearCanvas,
   debugPrint,
+  milliTimestamp,
+  fillStyle,
+  strokeStyle,
+  beginPath,
+  moveTo,
+  lineTo,
+  lineWidth,
+  fill,
+  stroke,
+  ellipse,
 };

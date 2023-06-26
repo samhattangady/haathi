@@ -59,3 +59,20 @@ POC stuff is done. I think we can stop here for today.
 The next thing to work on would be to figure out where the game code goes, and
 how much should go into main. Ideally, it should be as low as possible, but I
 guess that's not fully in our hands. But lets try =).
+
+---
+
+26 Jun 2023:
+So this week we have some work to get done on the jam. Some other time
+commitments also. So let's just see how it all turns out. I think that we can
+either start off on the game, or do some more amount of organisation. Though
+actually I think those both are the same.
+
+So lets just start off and see where it takes us I guess.
+Okay, it seems like we now have the basic scaffolding mostly set up. So now
+its just time to start implementing the rest of the things.
+
+So lets draw the target wave first. Let it be a sine wave.
+
+Okay, we have the basic of that thing rendering. Lets commit before we
+proceed.

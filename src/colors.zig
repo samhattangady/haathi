@@ -1,0 +1,36 @@
+const helpers = @import("helpers.zig");
+const Vec4 = helpers.Vec4;
+
+pub const solarized_base03_str = "#002b36";
+pub const solarized_base02_str = "#073642";
+pub const solarized_base01_str = "#586e75";
+pub const solarized_base00_str = "#657b83";
+pub const solarized_base0_str = "#839496";
+pub const solarized_base1_str = "#93a1a1";
+pub const solarized_base2_str = "#eee8d5";
+pub const solarized_base3_str = "#fdf6e3";
+pub const solarized_yellow_str = "#b58900";
+pub const solarized_orange_str = "#cb4b16";
+pub const solarized_red_str = "#dc322f";
+pub const solarized_magenta_str = "#d33682";
+pub const solarized_violet_str = "#6c71c4";
+pub const solarized_blue_str = "#268bd2";
+pub const solarized_cyan_str = "#2aa198";
+pub const solarized_green_str = "#859900";
+
+pub const solarized_base03 = Vec4.fromHexRgb("#002b36");
+pub const solarized_base02 = Vec4.fromHexRgb("#073642");
+pub const solarized_base01 = Vec4.fromHexRgb("#586e75");
+pub const solarized_base00 = Vec4.fromHexRgb("#657b83");
+pub const solarized_base0 = Vec4.fromHexRgb("#839496");
+pub const solarized_base1 = Vec4.fromHexRgb("#93a1a1");
+pub const solarized_base2 = Vec4.fromHexRgb("#eee8d5");
+pub const solarized_base3 = Vec4.fromHexRgb("#fdf6e3");
+pub const solarized_yellow = Vec4.fromHexRgb("#b58900");
+pub const solarized_orange = Vec4.fromHexRgb("#cb4b16");
+pub const solarized_red = Vec4.fromHexRgb("#dc322f");
+pub const solarized_magenta = Vec4.fromHexRgb("#d33682");
+pub const solarized_violet = Vec4.fromHexRgb("#6c71c4");
+pub const solarized_blue = Vec4.fromHexRgb("#268bd2");
+pub const solarized_cyan = Vec4.fromHexRgb("#2aa198");
+pub const solarized_green = Vec4.fromHexRgb("#859900");
