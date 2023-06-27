@@ -123,3 +123,16 @@ allow rightwards connections? That also should be a decent thing.
 Damn. Its a little complicated to figure out the smallest part of this to
 build. But yeah, that's now pushed to tomorrow. Decent progress overall I
 guess.
+
+---
+
+27 Jun 2023:
+Bit late start to the day today. But lets see what we can accomplish =)
+I think we need to just get some basic things up and working even if it does
+not have in game interactivity.
+Okay, now we need tofigure out exactly how the information will be travelling
+thorugh the "wires".
+
+Nice. We have a basic version running, and it looks good. Quite simple to code
+out overall, though ofcourse, setting up the things in code obviously makes it
+all a bit easier.
