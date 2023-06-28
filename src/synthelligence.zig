@@ -67,6 +67,7 @@ const COMPONENT_NAMES = [NUM_COMPONENTS][]const u8{
     "max",
     "x 0.5",
     "x 2",
+    "x -1",
     "avg",
     "output",
 };
@@ -86,6 +87,7 @@ const ComponentType = enum {
     max,
     scale_half,
     scale_double,
+    scale_negate,
     average,
     output_main,
 
@@ -127,6 +129,7 @@ const ComponentType = enum {
             .max,
             .scale_half,
             .scale_double,
+            .scale_negate,
             .average,
             => true,
             .output_main => false,
@@ -211,7 +214,7 @@ const ComponentButton = struct {
 
 const BUTTONS = [2][3]ComponentType{
     .{ .min, .average, .max },
-    .{ .scale_half, .const_zero, .scale_double },
+    .{ .scale_half, .scale_negate, .scale_double },
 };
 
 const ComponentSlot = struct {
@@ -222,25 +225,36 @@ const ComponentSlot = struct {
     col: u8,
 };
 
+const Connection = struct {
+    root: u8,
+    stem: u8,
+};
+
 const StateData = union(enum) {
     idle: struct { hovered_button: ?usize = null, hovered_slot: ?usize = null },
     idle_drag: void,
     button_drag: struct { component_type: ComponentType, hovered_slot: ?usize = null },
+    create_connection: struct { root: u8, stem: ?u8 = null },
 };
 
 pub const Game = struct {
     const Self = @This();
     haathi: *Haathi,
     target_points: WaveDisplay,
+
+    state: StateData = .{ .idle = .{} },
+    update_display: bool = true,
+    ticks: u64 = 0,
+    temp_connection: ?Connection = null,
+
     components: std.ArrayList(Component),
+    buttons: std.ArrayList(ComponentButton),
+    slots: std.ArrayList(ComponentSlot),
+    connections: std.ArrayList(Connection),
+
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
     arena: std.mem.Allocator,
-    update_display: bool = true,
-    buttons: std.ArrayList(ComponentButton),
-    slots: std.ArrayList(ComponentSlot),
-    state: StateData = .{ .idle = .{} },
-    ticks: u64 = 0,
 
     pub fn init(haathi: *Haathi) Self {
         const allocator = haathi.allocator;
@@ -301,11 +315,13 @@ pub const Game = struct {
             }
         }
         slots.items[slots.items.len - 1].component_type = .output_main;
+        var connections = std.ArrayList(Connection).init(allocator);
         return .{
             .haathi = haathi,
             .buttons = buttons,
             .slots = slots,
             .components = components,
+            .connections = connections,
             .target_points = target_points,
             .allocator = allocator,
             .arena_handle = arena_handle,
@@ -317,6 +333,7 @@ pub const Game = struct {
         self.components.deinit();
         self.buttons.deinit();
         self.slots.deinit();
+        self.connections.deinit();
         // TODO (28 Jun 2023 sam): deinit the allocators and things also?
     }
 
@@ -353,6 +370,12 @@ pub const Game = struct {
                         self.state = .{ .button_drag = .{ .component_type = self.buttons.items[hb].component_type } };
                         return;
                     }
+                    if (self.state.idle.hovered_slot) |hs| {
+                        if (self.slots.items[hs].component_type != null) {
+                            self.state = .{ .create_connection = .{ .root = @intCast(u8, hs) } };
+                            return;
+                        }
+                    }
                     self.state = .idle_drag;
                     return;
                 }
@@ -387,6 +410,26 @@ pub const Game = struct {
                     return;
                 }
             },
+            .create_connection => |data| {
+                const mouse = self.haathi.inputs.mouse;
+                self.state.create_connection.stem = null;
+                self.temp_connection = null;
+                for (self.slots.items, 0..) |slot, i| {
+                    if (slot.component_type == null) continue;
+                    if (slot.rect.contains(mouse.current_pos)) {
+                        self.state.create_connection.stem = @intCast(u8, i);
+                        self.temp_connection = .{ .root = data.root, .stem = @intCast(u8, i) };
+                    }
+                }
+                if (!mouse.l_button.is_down) {
+                    // if (self.state.create_connection.stem) |si|
+                    //     self.slots.items[si].component_type = data.component_type;
+                    if (self.temp_connection) |conn| self.addConnection(conn);
+                    self.temp_connection = null;
+                    self.state = .{ .idle = .{} };
+                    return;
+                }
+            },
         }
     }
 
@@ -412,6 +455,20 @@ pub const Game = struct {
         self.update_display = false;
     }
 
+    fn addConnection(self: *Self, connection: Connection) void {
+        // TODO (28 Jun 2023 sam): If stem only supports single input, remove all other connections with stem
+        self.connections.append(connection) catch unreachable;
+    }
+
+    pub fn drawConnection(self: *Self, connection: Connection) void {
+        var path = std.ArrayList(Vec2).init(self.arena);
+        const root = self.slots.items[connection.root].rect;
+        const stem = self.slots.items[connection.stem].rect;
+        path.append(root.position.add(root.size.scale(0.5))) catch unreachable;
+        path.append(stem.position.add(stem.size.scale(0.5))) catch unreachable;
+        self.haathi.drawPath(.{ .points = path.items[0..], .color = colors.solarized_base0 });
+    }
+
     pub fn render(self: *Self) void {
         const padding: f32 = DISPLAY_PADDING;
         const box_size = DISPLAY_BOX_SIZE;
@@ -425,6 +482,9 @@ pub const Game = struct {
         }
         self.haathi.drawPath(.{ .points = self.target_points.display[0..], .color = colors.solarized_base2 });
         var hovered_slot: ?usize = if (self.state == .idle) self.state.idle.hovered_slot else null;
+        if (hovered_slot == null and self.state == .create_connection) {
+            hovered_slot = self.state.create_connection.root;
+        }
         for (self.slots.items, 0..) |slot, i| {
             if (hovered_slot != null and hovered_slot.? == i) {
                 self.haathi.drawRect(.{
@@ -496,5 +556,7 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
+        for (self.connections.items) |conn| self.drawConnection(conn);
+        if (self.temp_connection) |conn| self.drawConnection(conn);
     }
 };
