@@ -96,6 +96,7 @@ pub const Haathi = struct {
             }
         }
         self.drawables.clearRetainingCapacity();
+        self.inputs.reset();
     }
 
     pub fn drawRect(self: *Self, rect: DrawRectOptions) void {

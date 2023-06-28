@@ -196,6 +196,13 @@ pub const Rect = struct {
     const Self = @This();
     position: Vec2,
     size: Vec2,
+
+    pub fn contains(self: *const Self, pos: Vec2) bool {
+        return (pos.x > self.position.x) and
+            (pos.x < self.position.x + self.size.x) and
+            (pos.y > self.position.y) and
+            (pos.y < self.position.y + self.size.y);
+    }
 };
 
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {

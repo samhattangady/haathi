@@ -23,6 +23,7 @@ const NUM_COMPONENT_COLS = 8;
 const NUM_BUTTON_ROWS = 2;
 const NUM_BUTTON_COLS = 3;
 const COMPONENT_RADIUS = COMPONENT_HEIGHT / 4;
+const HIGHLIGHT_WIDTH = 3;
 
 const FONT_1 = "18px JetBrainsMono";
 const TEXT_1_SIZE = 18;
@@ -67,7 +68,7 @@ const COMPONENT_NAMES = [NUM_COMPONENTS][]const u8{
     "x 0.5",
     "x 2",
     "avg",
-    "display",
+    "output",
 };
 
 const ComponentType = enum {
@@ -86,7 +87,7 @@ const ComponentType = enum {
     scale_half,
     scale_double,
     average,
-    display_main,
+    output_main,
 
     pub fn getSource(self: *const Self) ?*const [DISPLAY_SIZE]f32 {
         return switch (self.*) {
@@ -107,6 +108,28 @@ const ComponentType = enum {
             .max,
             => true,
             else => false,
+        };
+    }
+
+    pub fn canDelete(self: *const Self) bool {
+        return switch (self.*) {
+            .sin_half,
+            .sin_one,
+            .sin_two,
+            .const_one,
+            .const_zero,
+            .const_minus_one,
+            .cos_half,
+            .cos_one,
+            .cos_two,
+            => false,
+            .min,
+            .max,
+            .scale_half,
+            .scale_double,
+            .average,
+            => true,
+            .output_main => false,
         };
     }
 };
@@ -183,6 +206,26 @@ pub const Component = struct {
 const ComponentButton = struct {
     const Self = @This();
     rect: Rect,
+    component_type: ComponentType,
+};
+
+const BUTTONS = [2][3]ComponentType{
+    .{ .min, .average, .max },
+    .{ .scale_half, .const_zero, .scale_double },
+};
+
+const ComponentSlot = struct {
+    const Self = @This();
+    rect: Rect,
+    component_type: ?ComponentType = null,
+    row: u8,
+    col: u8,
+};
+
+const StateData = union(enum) {
+    idle: struct { hovered_button: ?usize = null, hovered_slot: ?usize = null },
+    idle_drag: void,
+    button_drag: struct { component_type: ComponentType, hovered_slot: ?usize = null },
 };
 
 pub const Game = struct {
@@ -195,6 +238,8 @@ pub const Game = struct {
     arena: std.mem.Allocator,
     update_display: bool = true,
     buttons: std.ArrayList(ComponentButton),
+    slots: std.ArrayList(ComponentSlot),
+    state: StateData = .{ .idle = .{} },
     ticks: u64 = 0,
 
     pub fn init(haathi: *Haathi) Self {
@@ -210,7 +255,7 @@ pub const Game = struct {
             components.append(Component.new(.sin_one)) catch unreachable;
             components.append(Component.new(.sin_two)) catch unreachable;
             components.append(Component.new(.min)) catch unreachable;
-            components.append(Component.new(.display_main)) catch unreachable;
+            components.append(Component.new(.output_main)) catch unreachable;
             _ = components.items[0].addStem(2);
             _ = components.items[1].addStem(2);
             _ = components.items[2].addRoot(0);
@@ -222,16 +267,44 @@ pub const Game = struct {
         {
             const button_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
             const button_padding_x: f32 = ((DISPLAY_BOX_SIZE.x + (DISPLAY_PADDING * 2)) - (NUM_BUTTON_COLS * COMPONENT_WIDTH)) / (NUM_BUTTON_COLS + 1);
-            for (0..3) |col| {
-                const col_x = @floatFromInt(f32, col);
-                const x = (1280 - DISPLAY_BOX_SIZE.x - (2 * DISPLAY_PADDING)) + (button_padding_x * (col_x + 1)) + (col_x * COMPONENT_WIDTH);
-                const y = 720 - button_padding_y;
-                buttons.append(.{ .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } } }) catch unreachable;
+            for (BUTTONS, 0..) |button_row, row| {
+                for (button_row, 0..) |button, col| {
+                    if (button == .const_zero) continue;
+                    const col_x = @floatFromInt(f32, col);
+                    const x = (1280 - DISPLAY_BOX_SIZE.x - (2 * DISPLAY_PADDING)) + (button_padding_x * (col_x + 1)) + (col_x * COMPONENT_WIDTH);
+                    const y = button_padding_y + ((@floatFromInt(f32, row) + (NUM_COMPONENT_ROWS - BUTTONS.len)) * (button_padding_y + COMPONENT_HEIGHT));
+                    buttons.append(.{
+                        .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
+                        .component_type = button,
+                    }) catch unreachable;
+                }
             }
         }
+        var slots = std.ArrayList(ComponentSlot).init(allocator);
+        {
+            const component_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
+            const component_padding_x: f32 = ((1280 - DISPLAY_BOX_SIZE.x - (DISPLAY_PADDING * 2)) - (NUM_COMPONENT_COLS * COMPONENT_WIDTH)) / (NUM_COMPONENT_COLS + 1);
+            for (0..NUM_COMPONENT_COLS) |row| {
+                const j = @floatFromInt(f32, row);
+                const x = ((j + 1) * component_padding_x) + (j * COMPONENT_WIDTH);
+                for (0..NUM_COMPONENT_ROWS) |col| {
+                    const i = @floatFromInt(f32, col);
+                    const y = ((i + 1) * component_padding_y) + (i * COMPONENT_HEIGHT);
+                    const t: ?ComponentType = if (row == 0) @enumFromInt(ComponentType, col) else null;
+                    slots.append(.{
+                        .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
+                        .component_type = t,
+                        .row = @intCast(u8, row),
+                        .col = @intCast(u8, col),
+                    }) catch unreachable;
+                }
+            }
+        }
+        slots.items[slots.items.len - 1].component_type = .output_main;
         return .{
             .haathi = haathi,
             .buttons = buttons,
+            .slots = slots,
             .components = components,
             .target_points = target_points,
             .allocator = allocator,
@@ -243,6 +316,7 @@ pub const Game = struct {
     pub fn deinit(self: *Self) void {
         self.components.deinit();
         self.buttons.deinit();
+        self.slots.deinit();
         // TODO (28 Jun 2023 sam): deinit the allocators and things also?
     }
 
@@ -252,7 +326,68 @@ pub const Game = struct {
         self.arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         self.arena = self.arena_handle.allocator();
         self.ticks = ticks;
+        self.updateMouseState();
         if (self.update_display) self.updateGraphs();
+    }
+
+    fn updateMouseState(self: *Self) void {
+        switch (self.state) {
+            .idle => {
+                const mouse = self.haathi.inputs.mouse;
+                self.state.idle.hovered_button = null;
+                self.state.idle.hovered_slot = null;
+                for (self.buttons.items, 0..) |button, i| {
+                    if (button.rect.contains(mouse.current_pos)) {
+                        self.state.idle.hovered_button = i;
+                        break;
+                    }
+                }
+                for (self.slots.items, 0..) |slot, i| {
+                    if (slot.rect.contains(mouse.current_pos)) {
+                        self.state.idle.hovered_slot = i;
+                        break;
+                    }
+                }
+                if (mouse.l_button.is_clicked) {
+                    if (self.state.idle.hovered_button) |hb| {
+                        self.state = .{ .button_drag = .{ .component_type = self.buttons.items[hb].component_type } };
+                        return;
+                    }
+                    self.state = .idle_drag;
+                    return;
+                }
+                if (mouse.r_button.is_clicked) {
+                    if (self.state.idle.hovered_slot) |si| {
+                        if (self.slots.items[si].component_type) |ct| {
+                            if (ct.canDelete()) self.slots.items[si].component_type = null;
+                        }
+                    }
+                }
+            },
+            .idle_drag => {
+                const mouse = self.haathi.inputs.mouse;
+                if (!mouse.l_button.is_down) {
+                    self.state = .{ .idle = .{} };
+                    return;
+                }
+            },
+            .button_drag => |data| {
+                const mouse = self.haathi.inputs.mouse;
+                self.state.button_drag.hovered_slot = null;
+                for (self.slots.items, 0..) |slot, i| {
+                    if (slot.component_type != null) continue;
+                    if (slot.rect.contains(mouse.current_pos)) {
+                        self.state.button_drag.hovered_slot = i;
+                    }
+                }
+                if (!mouse.l_button.is_down) {
+                    if (self.state.button_drag.hovered_slot) |si|
+                        self.slots.items[si].component_type = data.component_type;
+                    self.state = .{ .idle = .{} };
+                    return;
+                }
+            },
+        }
     }
 
     fn updateGraphs(self: *Self) void {
@@ -269,7 +404,7 @@ pub const Game = struct {
                 if (component.type.isCalc()) {
                     component.propogateCalculation(self.components.items);
                 }
-                if (component.type == .display_main) {
+                if (component.type == .output_main) {
                     self.target_points.points[i] = component.inputs[0];
                 }
             }
@@ -289,42 +424,76 @@ pub const Game = struct {
             self.target_points.display[i] = .{ .x = x, .y = y };
         }
         self.haathi.drawPath(.{ .points = self.target_points.display[0..], .color = colors.solarized_base2 });
-        self.haathi.drawRect(.{ .position = self.haathi.inputs.mouse.current_pos, .size = .{ .x = 5, .y = 5 }, .color = colors.solarized_base00 });
-        // Drawing the components
-        {
-            const component_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
-            const component_padding_x: f32 = ((1280 - DISPLAY_BOX_SIZE.x - (DISPLAY_PADDING * 2)) - (NUM_COMPONENT_COLS * COMPONENT_WIDTH)) / (NUM_COMPONENT_COLS + 1);
-            for (0..NUM_COMPONENT_COLS) |row| {
-                const j = @floatFromInt(f32, row);
-                const x = ((j + 1) * component_padding_x) + (j * COMPONENT_WIDTH);
-                for (0..NUM_COMPONENT_ROWS) |col| {
-                    const i = @floatFromInt(f32, col);
-                    const y = ((i + 1) * component_padding_y) + (i * COMPONENT_HEIGHT);
-                    const color = if (row == 0) colors.solarized_base1 else colors.solarized_base2;
-                    self.haathi.drawRect(.{
-                        .position = .{ .x = x, .y = y },
-                        .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT },
-                        .color = color,
-                        .radius = COMPONENT_RADIUS,
-                    });
-                    // TODO (28 Jun 2023 sam): Not ideal that we are using the component enum ordering for this.
-                    if (row == 0) {
-                        self.haathi.drawText(.{
-                            .text = COMPONENT_NAMES[col],
-                            .position = .{ .x = x + (COMPONENT_WIDTH / 2), .y = y + TEXT_1_YOFF },
-                            .color = colors.solarized_base3,
-                            .style = FONT_1,
-                        });
-                    }
-                }
+        var hovered_slot: ?usize = if (self.state == .idle) self.state.idle.hovered_slot else null;
+        for (self.slots.items, 0..) |slot, i| {
+            if (hovered_slot != null and hovered_slot.? == i) {
+                self.haathi.drawRect(.{
+                    .position = slot.rect.position.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
+                    .size = slot.rect.size.add(.{ .x = HIGHLIGHT_WIDTH * 2, .y = HIGHLIGHT_WIDTH * 2 }),
+                    .color = colors.solarized_base01,
+                    .radius = COMPONENT_RADIUS + HIGHLIGHT_WIDTH,
+                });
+            }
+            if (slot.component_type) |t| {
+                self.haathi.drawRect(.{
+                    .position = slot.rect.position,
+                    .size = slot.rect.size,
+                    .color = colors.solarized_base0,
+                    .radius = COMPONENT_RADIUS,
+                });
+                self.haathi.drawText(.{
+                    .text = COMPONENT_NAMES[@intFromEnum(t)],
+                    .position = slot.rect.position.add(.{ .x = slot.rect.size.x / 2, .y = TEXT_1_YOFF }),
+                    .color = colors.solarized_base3,
+                    .style = FONT_1,
+                });
+            } else {
+                self.haathi.drawRect(.{
+                    .position = slot.rect.position,
+                    .size = slot.rect.size,
+                    .color = colors.solarized_base2,
+                    .radius = COMPONENT_RADIUS,
+                });
             }
         }
-        for (self.buttons.items) |button| {
+        var hovered_button: ?usize = if (self.state == .idle) self.state.idle.hovered_button else null;
+        for (self.buttons.items, 0..) |button, i| {
+            if (hovered_button != null and hovered_button.? == i) {
+                self.haathi.drawRect(.{
+                    .position = button.rect.position.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
+                    .size = button.rect.size.add(.{ .x = HIGHLIGHT_WIDTH * 2, .y = HIGHLIGHT_WIDTH * 2 }),
+                    .color = colors.solarized_base3,
+                    .radius = COMPONENT_RADIUS + HIGHLIGHT_WIDTH,
+                });
+            }
             self.haathi.drawRect(.{
                 .position = button.rect.position,
                 .size = button.rect.size,
                 .color = colors.solarized_base00,
                 .radius = COMPONENT_RADIUS,
+            });
+            self.haathi.drawText(.{
+                .text = COMPONENT_NAMES[@intFromEnum(button.component_type)],
+                .position = button.rect.position.add(.{ .x = button.rect.size.x / 2, .y = TEXT_1_YOFF }),
+                .color = colors.solarized_base2,
+                .style = FONT_1,
+            });
+        }
+        if (self.state == .button_drag) {
+            const size = Vec2{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT };
+            var pos = self.haathi.inputs.mouse.current_pos.add(size.scale(-0.5));
+            if (self.state.button_drag.hovered_slot) |si| pos = self.slots.items[si].rect.position;
+            self.haathi.drawRect(.{
+                .position = pos,
+                .size = size,
+                .color = colors.solarized_base01,
+                .radius = COMPONENT_RADIUS,
+            });
+            self.haathi.drawText(.{
+                .text = COMPONENT_NAMES[@intFromEnum(self.state.button_drag.component_type)],
+                .position = pos.add(.{ .x = size.x / 2, .y = TEXT_1_YOFF }),
+                .color = colors.solarized_base2,
+                .style = FONT_1,
             });
         }
     }
