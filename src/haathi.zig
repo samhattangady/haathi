@@ -86,8 +86,16 @@ pub const Haathi = struct {
                     }
                     c.stroke();
                 },
+                .text => |text| {
+                    text.color.toHexRgba(color_buffer[0..]);
+                    c.fillStyle(color_buffer[0..].ptr);
+                    c.font(text.style.ptr);
+                    c.textAlign(@tagName(text.alignment).ptr);
+                    c.fillText(text.text.ptr, text.position.x, text.position.y, text.width);
+                },
             }
         }
+        self.drawables.clearRetainingCapacity();
     }
 
     pub fn drawRect(self: *Self, rect: DrawRectOptions) void {
@@ -96,11 +104,15 @@ pub const Haathi = struct {
     pub fn drawPath(self: *Self, path: DrawPathOptions) void {
         self.drawables.append(.{ .path = path }) catch unreachable;
     }
+    pub fn drawText(self: *Self, text: DrawTextOptions) void {
+        self.drawables.append(.{ .text = text }) catch unreachable;
+    }
 };
 
 pub const Drawable = union(enum) {
     rect: DrawRectOptions,
     path: DrawPathOptions,
+    text: DrawTextOptions,
 };
 
 pub const DrawRectOptions = struct {
@@ -114,4 +126,21 @@ pub const DrawPathOptions = struct {
     points: []Vec2,
     color: Vec4,
     width: f32 = 5,
+};
+
+const TextAlignment = enum {
+    start,
+    end,
+    left,
+    right,
+    center,
+};
+
+pub const DrawTextOptions = struct {
+    text: []const u8,
+    position: Vec2,
+    color: Vec4,
+    style: []const u8,
+    width: f32 = 1280,
+    alignment: TextAlignment = .center,
 };

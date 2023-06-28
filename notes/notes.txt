@@ -136,3 +136,16 @@ thorugh the "wires".
 Nice. We have a basic version running, and it looks good. Quite simple to code
 out overall, though ofcourse, setting up the things in code obviously makes it
 all a bit easier.
+
+---
+
+28 Jun 2023:
+We got the basic things up. Now we need to add some kind of interface that we
+can interact with. Okay then.
+We also need to figure out exactly what is the interface that we want to build
+for the thing.
+Also game name idea: sine cosine desine
+
+Back to the interface though for now. We had some ideas I think. The main
+thing that we need to accomplish is to make sure that there is nothing that is
+being connected backwards.

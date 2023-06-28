@@ -192,6 +192,12 @@ pub const Vec4 = struct {
     }
 };
 
+pub const Rect = struct {
+    const Self = @This();
+    position: Vec2,
+    size: Vec2,
+};
+
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
     // Bezier Blend as per StackOverflow : https://stackoverflow.com/a/25730573/5453127
     // t goes between 0 and 1.
@@ -201,4 +207,13 @@ pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
 
 pub fn milliTimestamp() u64 {
     return @intCast(u64, c.milliTimestamp());
+}
+
+pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
+    var buffer: [1024]u8 = undefined;
+    const message = std.fmt.bufPrintZ(buffer[0..], fmt, args) catch {
+        c.debugPrint("message was too long to print");
+        return;
+    };
+    c.debugPrint(message.ptr);
 }

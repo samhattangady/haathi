@@ -12,3 +12,6 @@ pub extern fn moveTo(x: f32, y: f32) void;
 pub extern fn lineTo(x: f32, y: f32) void;
 pub extern fn lineWidth(width: f32) void;
 pub extern fn ellipse(x: f32, y: f32, rx: f32, ry: f32, start: f32, end: f32, counter: bool) void;
+pub extern fn font(font: [*]const u8) void;
+pub extern fn fillText(text: [*]const u8, x: f32, y: f32, width: f32) void;
+pub extern fn textAlign(alignment: [*]const u8) void;

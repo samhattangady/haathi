@@ -139,6 +139,18 @@ const ellipse = (x, y, radius_x, radius_y, rotation, start_angle, end_angle, cou
   ctx.ellipse(x, y, radiusX, radiusY, rotation, startAngle, endAngle);
 }
 
+const font = (style) => {
+  ctx.font = wasmString(style);
+}
+
+const textAlign = (alignment) => {
+  ctx.textAlign = wasmString(alignment);
+}
+
+const fillText = (text, x, y, width) => {
+  ctx.fillText(wasmString(text), x, y, width);
+}
+
 var api = {
   fillRect,
   roundRect,
@@ -154,4 +166,7 @@ var api = {
   fill,
   stroke,
   ellipse,
+  font,
+  fillText,
+  textAlign,
 };
