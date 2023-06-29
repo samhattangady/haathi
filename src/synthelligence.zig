@@ -5,6 +5,7 @@ const colors = @import("colors.zig");
 
 const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
+const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
 
 const DISPLAY_SIZE = 300;
@@ -14,6 +15,9 @@ const SIN_TWO = sineWaveScaled(2);
 const COS_HALF = cosWaveScaled(0.5);
 const COS_ONE = cosWaveScaled(1);
 const COS_TWO = cosWaveScaled(2);
+const CONST_ONE = constantWave(1);
+const CONST_ZERO = constantWave(0);
+const CONST_MINUS_ONE = constantWave(-1);
 const DISPLAY_PADDING = 10;
 const DISPLAY_BOX_SIZE = Vec2{ .x = 300, .y = 200 };
 const COMPONENT_HEIGHT = 28;
@@ -48,6 +52,14 @@ fn cosWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     return points;
 }
 
+fn constantWave(scale: f32) [DISPLAY_SIZE]f32 {
+    var points: [DISPLAY_SIZE]f32 = undefined;
+    for (0..DISPLAY_SIZE) |i| {
+        points[i] = scale;
+    }
+    return points;
+}
+
 const WaveDisplay = struct {
     points: [DISPLAY_SIZE]f32 = [_]f32{0} ** DISPLAY_SIZE,
     display: [DISPLAY_SIZE]Vec2 = undefined,
@@ -57,9 +69,9 @@ const COMPONENT_NAMES = [NUM_COMPONENTS][]const u8{
     "sin t/2",
     "sin t",
     "sin 2t",
-    "-1",
-    "0",
     "1",
+    "0",
+    "-1",
     "cos t/2",
     "cos t",
     "cos 2t",
@@ -68,6 +80,9 @@ const COMPONENT_NAMES = [NUM_COMPONENTS][]const u8{
     "x 0.5",
     "x 2",
     "x -1",
+    "x t",
+    "x 2t",
+    "x (1-t)",
     "avg",
     "output",
 };
@@ -88,6 +103,9 @@ const ComponentType = enum {
     scale_half,
     scale_double,
     scale_negate,
+    scale_t,
+    scale_two_t,
+    scale_one_minus_t,
     average,
     output_main,
 
@@ -96,11 +114,24 @@ const ComponentType = enum {
             .sin_half => &SIN_HALF,
             .sin_one => &SIN_ONE,
             .sin_two => &SIN_TWO,
-            .cos_half,
-            .cos_one,
-            .cos_two,
-            => null, // TODO
-            else => null,
+            .cos_half => &COS_HALF,
+            .cos_one => &COS_ONE,
+            .cos_two => &COS_TWO,
+            .const_one => &CONST_ONE,
+            .const_zero => &CONST_ZERO,
+            .const_minus_one => &CONST_MINUS_ONE,
+            // non source types
+            .min,
+            .max,
+            .scale_half,
+            .scale_double,
+            .scale_negate,
+            .scale_t,
+            .scale_two_t,
+            .scale_one_minus_t,
+            .average,
+            .output_main,
+            => null,
         };
     }
 
@@ -108,8 +139,25 @@ const ComponentType = enum {
         return switch (self.*) {
             .min,
             .max,
+            .scale_half,
+            .scale_double,
+            .scale_negate,
+            .scale_t,
+            .scale_two_t,
+            .scale_one_minus_t,
+            .average,
             => true,
-            else => false,
+            .sin_half,
+            .sin_one,
+            .sin_two,
+            .const_one,
+            .const_zero,
+            .const_minus_one,
+            .cos_half,
+            .cos_one,
+            .cos_two,
+            .output_main,
+            => false,
         };
     }
 
@@ -130,9 +178,38 @@ const ComponentType = enum {
             .scale_half,
             .scale_double,
             .scale_negate,
+            .scale_t,
+            .scale_two_t,
+            .scale_one_minus_t,
             .average,
             => true,
             .output_main => false,
+        };
+    }
+
+    pub fn singleInput(self: *const Self) bool {
+        return switch (self.*) {
+            .scale_half,
+            .scale_double,
+            .scale_negate,
+            .scale_t,
+            .scale_two_t,
+            .scale_one_minus_t,
+            .output_main,
+            => true,
+            .min,
+            .max,
+            .average,
+            .sin_half,
+            .sin_one,
+            .sin_two,
+            .const_one,
+            .const_zero,
+            .const_minus_one,
+            .cos_half,
+            .cos_one,
+            .cos_two,
+            => false,
         };
     }
 };
@@ -185,7 +262,7 @@ pub const Component = struct {
         return true;
     }
 
-    pub fn propogateCalculation(self: *Self, components: []Self) void {
+    pub fn propogateCalculation(self: *Self, components: []Self, index: usize) void {
         switch (self.type) {
             .min => {
                 var min_value: f32 = 2;
@@ -201,7 +278,42 @@ pub const Component = struct {
                 }
                 for (self.stems) |stem| _ = components[stem].addInput(max_value);
             },
-            else => {},
+            .scale_half => {
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * 0.5;
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .scale_double => {
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * 2;
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .scale_negate => {
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * -1;
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .scale_t => {
+                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * t;
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .scale_one_minus_t => {
+                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * (1 - t);
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .scale_two_t => {
+                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const val = if (self.inputs.len == 0) 0 else self.inputs[0] * (2 * t);
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
+            .average => {
+                var avg_val: f32 = 0;
+                if (self.inputs.len > 0) {
+                    for (self.inputs) |input| avg_val += input;
+                    avg_val = avg_val / @floatFromInt(f32, self.inputs.len);
+                }
+                for (self.stems) |stem| _ = components[stem].addInput(avg_val);
+            },
+            else => unreachable,
         }
     }
 };
@@ -212,9 +324,10 @@ const ComponentButton = struct {
     component_type: ComponentType,
 };
 
-const BUTTONS = [2][3]ComponentType{
-    .{ .min, .average, .max },
+const BUTTONS = [3][3]ComponentType{
+    .{ .scale_one_minus_t, .scale_t, .scale_two_t },
     .{ .scale_half, .scale_negate, .scale_double },
+    .{ .min, .average, .max },
 };
 
 const ComponentSlot = struct {
@@ -223,6 +336,11 @@ const ComponentSlot = struct {
     component_type: ?ComponentType = null,
     row: u8,
     col: u8,
+
+    pub fn singleInput(self: *const Self) bool {
+        if (self.component_type) |ct| return ct.singleInput();
+        return false;
+    }
 };
 
 const Connection = struct {
@@ -241,16 +359,19 @@ pub const Game = struct {
     const Self = @This();
     haathi: *Haathi,
     target_points: WaveDisplay,
+    output_points: WaveDisplay,
 
     state: StateData = .{ .idle = .{} },
     update_display: bool = true,
     ticks: u64 = 0,
     temp_connection: ?Connection = null,
+    output_slot_index: usize,
 
     components: std.ArrayList(Component),
     buttons: std.ArrayList(ComponentButton),
     slots: std.ArrayList(ComponentSlot),
     connections: std.ArrayList(Connection),
+    hovered_connections: std.ArrayList(usize),
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -261,22 +382,10 @@ pub const Game = struct {
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         var target_points = WaveDisplay{};
         for (0..DISPLAY_SIZE) |i| {
-            var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 4;
-            target_points.points[i] = @sin(val);
+            var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+            target_points.points[i] = @fabs(@sin(val));
         }
         var components = std.ArrayList(Component).init(allocator);
-        {
-            components.append(Component.new(.sin_one)) catch unreachable;
-            components.append(Component.new(.sin_two)) catch unreachable;
-            components.append(Component.new(.min)) catch unreachable;
-            components.append(Component.new(.output_main)) catch unreachable;
-            _ = components.items[0].addStem(2);
-            _ = components.items[1].addStem(2);
-            _ = components.items[2].addRoot(0);
-            _ = components.items[2].addRoot(1);
-            _ = components.items[2].addStem(3);
-            _ = components.items[3].addRoot(2);
-        }
         var buttons = std.ArrayList(ComponentButton).init(allocator);
         {
             const button_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
@@ -286,7 +395,8 @@ pub const Game = struct {
                     if (button == .const_zero) continue;
                     const col_x = @floatFromInt(f32, col);
                     const x = (1280 - DISPLAY_BOX_SIZE.x - (2 * DISPLAY_PADDING)) + (button_padding_x * (col_x + 1)) + (col_x * COMPONENT_WIDTH);
-                    const y = button_padding_y + ((@floatFromInt(f32, row) + (NUM_COMPONENT_ROWS - BUTTONS.len)) * (button_padding_y + COMPONENT_HEIGHT));
+                    const y = 720 - ((1.3 * button_padding_y) + (@floatFromInt(f32, row) * ((button_padding_y / 2) + COMPONENT_HEIGHT)));
+                    // const y = button_padding_y + ((@floatFromInt(f32, row) + (NUM_COMPONENT_ROWS - BUTTONS.len)) * ((button_padding_y / 2) + COMPONENT_HEIGHT));
                     buttons.append(.{
                         .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
                         .component_type = button,
@@ -298,13 +408,13 @@ pub const Game = struct {
         {
             const component_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
             const component_padding_x: f32 = ((1280 - DISPLAY_BOX_SIZE.x - (DISPLAY_PADDING * 2)) - (NUM_COMPONENT_COLS * COMPONENT_WIDTH)) / (NUM_COMPONENT_COLS + 1);
-            for (0..NUM_COMPONENT_COLS) |row| {
-                const j = @floatFromInt(f32, row);
+            for (0..NUM_COMPONENT_COLS) |col| {
+                const j = @floatFromInt(f32, col);
                 const x = ((j + 1) * component_padding_x) + (j * COMPONENT_WIDTH);
-                for (0..NUM_COMPONENT_ROWS) |col| {
-                    const i = @floatFromInt(f32, col);
+                for (0..NUM_COMPONENT_ROWS) |row| {
+                    const i = @floatFromInt(f32, row);
                     const y = ((i + 1) * component_padding_y) + (i * COMPONENT_HEIGHT);
-                    const t: ?ComponentType = if (row == 0) @enumFromInt(ComponentType, col) else null;
+                    const t: ?ComponentType = if (col == 0) @enumFromInt(ComponentType, row) else null;
                     slots.append(.{
                         .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
                         .component_type = t,
@@ -322,7 +432,10 @@ pub const Game = struct {
             .slots = slots,
             .components = components,
             .connections = connections,
+            .hovered_connections = std.ArrayList(usize).init(allocator),
             .target_points = target_points,
+            .output_points = WaveDisplay{},
+            .output_slot_index = slots.items.len - 1,
             .allocator = allocator,
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
@@ -334,6 +447,7 @@ pub const Game = struct {
         self.buttons.deinit();
         self.slots.deinit();
         self.connections.deinit();
+        self.hovered_connections.deinit();
         // TODO (28 Jun 2023 sam): deinit the allocators and things also?
     }
 
@@ -353,6 +467,7 @@ pub const Game = struct {
                 const mouse = self.haathi.inputs.mouse;
                 self.state.idle.hovered_button = null;
                 self.state.idle.hovered_slot = null;
+                self.hovered_connections.clearRetainingCapacity();
                 for (self.buttons.items, 0..) |button, i| {
                     if (button.rect.contains(mouse.current_pos)) {
                         self.state.idle.hovered_button = i;
@@ -382,7 +497,16 @@ pub const Game = struct {
                 if (mouse.r_button.is_clicked) {
                     if (self.state.idle.hovered_slot) |si| {
                         if (self.slots.items[si].component_type) |ct| {
+                            self.deleteConnectionsInvolving(si);
                             if (ct.canDelete()) self.slots.items[si].component_type = null;
+                            self.update_display = true;
+                        }
+                    }
+                }
+                if (self.state.idle.hovered_slot) |si| {
+                    if (self.slots.items[si].component_type) |_| {
+                        for (self.connections.items, 0..) |conn, i| {
+                            if (conn.root == si or conn.stem == si) self.hovered_connections.append(i) catch unreachable;
                         }
                     }
                 }
@@ -417,8 +541,10 @@ pub const Game = struct {
                 for (self.slots.items, 0..) |slot, i| {
                     if (slot.component_type == null) continue;
                     if (slot.rect.contains(mouse.current_pos)) {
-                        self.state.create_connection.stem = @intCast(u8, i);
-                        self.temp_connection = .{ .root = data.root, .stem = @intCast(u8, i) };
+                        if (i > data.root) {
+                            self.state.create_connection.stem = @intCast(u8, i);
+                            self.temp_connection = .{ .root = data.root, .stem = @intCast(u8, i) };
+                        }
                     }
                 }
                 if (!mouse.l_button.is_down) {
@@ -434,9 +560,28 @@ pub const Game = struct {
     }
 
     fn updateGraphs(self: *Self) void {
-        // TODO (27 Jun 2023 sam): We are doing a single pass here. Maybe that cannot be done
-        // in the future? Or we would need some kind of reordering to be done when updating
-        // connections.
+        // clear the existing display
+        @memset(self.output_points.points[0..], 0);
+        self.components.clearRetainingCapacity();
+        // create the new components
+        {
+            // index_map has key as the slot index, value as component index
+            var index_map = std.AutoHashMap(u8, u8).init(self.arena);
+            defer index_map.deinit();
+            for (self.slots.items, 0..) |slot, si| {
+                if (slot.component_type) |ct| {
+                    const comp_index = @intCast(u8, self.components.items.len);
+                    self.components.append(Component.new(ct)) catch unreachable;
+                    index_map.put(@intCast(u8, si), comp_index) catch unreachable;
+                }
+            }
+            for (self.connections.items) |conn| {
+                const ri = index_map.get(conn.root).?;
+                const si = index_map.get(conn.stem).?;
+                _ = self.components.items[ri].addStem(si);
+                _ = self.components.items[si].addRoot(ri);
+            }
+        }
         for (0..DISPLAY_SIZE) |i| {
             for (self.components.items) |*component| component.clearInputs();
             for (self.components.items) |*component| {
@@ -445,10 +590,10 @@ pub const Game = struct {
                     for (component.stems) |stem_idx| _ = self.components.items[stem_idx].addInput(val);
                 }
                 if (component.type.isCalc()) {
-                    component.propogateCalculation(self.components.items);
+                    component.propogateCalculation(self.components.items, i);
                 }
-                if (component.type == .output_main) {
-                    self.target_points.points[i] = component.inputs[0];
+                if (component.type == .output_main and component.inputs.len > 0) {
+                    self.output_points.points[i] = component.inputs[0];
                 }
             }
         }
@@ -456,17 +601,41 @@ pub const Game = struct {
     }
 
     fn addConnection(self: *Self, connection: Connection) void {
-        // TODO (28 Jun 2023 sam): If stem only supports single input, remove all other connections with stem
-        self.connections.append(connection) catch unreachable;
+        // Every connection should have the stem_idx > root_idx
+        if (connection.stem > connection.root) {
+            // If stem only supports single input, remove all other connections with stem
+            if (self.slots.items[connection.stem].singleInput()) self.deleteConnectionsWithStem(connection.stem);
+            self.connections.append(connection) catch unreachable;
+            self.update_display = true;
+        }
     }
 
-    pub fn drawConnection(self: *Self, connection: Connection) void {
+    fn deleteConnectionsWithStem(self: *Self, index: u8) void {
+        var i: usize = self.connections.items.len;
+        while (i > 0) : (i -= 1) {
+            const j = i - 1;
+            const conn = self.connections.items[j];
+            if (conn.stem == index) _ = self.connections.orderedRemove(j);
+        }
+    }
+
+    fn deleteConnectionsInvolving(self: *Self, index: usize) void {
+        var i: usize = self.connections.items.len;
+        while (i > 0) : (i -= 1) {
+            const j = i - 1;
+            const conn = self.connections.items[j];
+            if (conn.root == index or conn.stem == index) _ = self.connections.orderedRemove(j);
+        }
+    }
+
+    pub fn drawConnection(self: *Self, connection: Connection, active: bool) void {
+        var color = if (active) colors.solarized_base02 else colors.solarized_base0;
         var path = std.ArrayList(Vec2).init(self.arena);
         const root = self.slots.items[connection.root].rect;
         const stem = self.slots.items[connection.stem].rect;
         path.append(root.position.add(root.size.scale(0.5))) catch unreachable;
         path.append(stem.position.add(stem.size.scale(0.5))) catch unreachable;
-        self.haathi.drawPath(.{ .points = path.items[0..], .color = colors.solarized_base0 });
+        self.haathi.drawPath(.{ .points = path.items[0..], .color = color });
     }
 
     pub fn render(self: *Self) void {
@@ -475,12 +644,17 @@ pub const Game = struct {
         const box_pos = Vec2{ .x = 1280 - (padding + box_size.x), .y = padding };
         self.haathi.drawRect(.{ .position = .{ .x = 1280 - ((padding * 2) + 300), .y = 0 }, .size = .{ .x = 300 + (padding * 2), .y = 720 }, .color = colors.solarized_base0 });
         self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base1, .radius = 10 });
-        for (self.target_points.points, 0..) |point, i| {
-            const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
-            const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
-            self.target_points.display[i] = .{ .x = x, .y = y };
+        const displays = [_]*WaveDisplay{ &self.target_points, &self.output_points };
+        const cols = [displays.len]Vec4{ colors.solarized_base2, colors.solarized_base03 };
+        const widths = [displays.len]f32{ 8, 3 };
+        for (displays, cols, widths) |display, col, w| {
+            for (display.points, 0..) |point, i| {
+                const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
+                const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
+                display.display[i] = .{ .x = x, .y = y };
+            }
+            self.haathi.drawPath(.{ .points = display.display[0..], .color = col, .width = w });
         }
-        self.haathi.drawPath(.{ .points = self.target_points.display[0..], .color = colors.solarized_base2 });
         var hovered_slot: ?usize = if (self.state == .idle) self.state.idle.hovered_slot else null;
         if (hovered_slot == null and self.state == .create_connection) {
             hovered_slot = self.state.create_connection.root;
@@ -556,7 +730,8 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
-        for (self.connections.items) |conn| self.drawConnection(conn);
-        if (self.temp_connection) |conn| self.drawConnection(conn);
+        for (self.connections.items) |conn| self.drawConnection(conn, false);
+        if (self.temp_connection) |conn| self.drawConnection(conn, true);
+        for (self.hovered_connections.items) |ci| self.drawConnection(self.connections.items[ci], true);
     }
 };

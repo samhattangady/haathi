@@ -149,3 +149,16 @@ Also game name idea: sine cosine desine
 Back to the interface though for now. We had some ideas I think. The main
 thing that we need to accomplish is to make sure that there is nothing that is
 being connected backwards.
+
+That was quite a bit that we got done today.
+I think tomorrow we have to clean up creating and deleting connections. We
+were concerned that there was no way to delete a connection on an undeletable
+component, but there is no reason why a right click couldn't just remove all
+its connections...
+
+
+---
+
+29 Jun 2023:
+Okay what is the first thing that awe can work on today? It's either
+converting the connections to the component tree. Or some more controls.
