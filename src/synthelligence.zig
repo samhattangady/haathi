@@ -237,6 +237,33 @@ const ComponentType = enum {
         };
     }
 
+    pub fn acceptInput(self: *const Self) bool {
+        return switch (self.*) {
+            .min,
+            .max,
+            .scale_half,
+            .scale_double,
+            .scale_negate,
+            .scale_t,
+            .scale_two_t,
+            .scale_one_minus_t,
+            .average,
+            .output_main,
+            .display1,
+            => true,
+            .sin_half,
+            .sin_one,
+            .sin_two,
+            .const_one,
+            .const_zero,
+            .const_minus_one,
+            .cos_half,
+            .cos_one,
+            .cos_two,
+            => false,
+        };
+    }
+
     pub fn isCalc(self: *const Self) bool {
         return switch (self.*) {
             .min,
@@ -438,6 +465,7 @@ const Control = enum {
     verify,
     previous_level,
     next_level,
+    tutorial,
 };
 
 const ControlButton = struct {
@@ -502,6 +530,7 @@ pub const Game = struct {
     slots: std.ArrayList(ComponentSlot),
     connections: std.ArrayList(Connection),
     hovered_connections: std.ArrayList(usize),
+    show_tutorial: bool = false,
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -583,6 +612,14 @@ pub const Game = struct {
                 },
                 .text = "clear",
                 .control = .clear,
+            }) catch unreachable;
+            controls.append(.{
+                .rect = .{
+                    .position = .{ .x = x_start + COMPONENT_WIDTH + 10, .y = clear_row_y },
+                    .size = .{ .x = COMPONENT_WIDTH + 30, .y = COMPONENT_HEIGHT },
+                },
+                .text = "tutorial",
+                .control = .tutorial,
             }) catch unreachable;
             controls.append(.{
                 .rect = .{
@@ -716,6 +753,7 @@ pub const Game = struct {
                 self.temp_connection = null;
                 for (self.slots.items, 0..) |slot, i| {
                     if (slot.component_type == null) continue;
+                    if (!slot.component_type.acceptInput()) continue;
                     if (slot.rect.contains(mouse.current_pos)) {
                         if (i > data.root) {
                             self.state.create_connection.stem = @intCast(u8, i);
@@ -761,6 +799,9 @@ pub const Game = struct {
                     self.update_display = true;
                     self.stage_index += 1;
                 }
+            },
+            .tutorial => {
+                self.show_tutorial = !self.show_tutorial;
             },
         }
     }
@@ -924,23 +965,25 @@ pub const Game = struct {
     }
 
     pub fn render(self: *Self) void {
-        const padding: f32 = DISPLAY_PADDING;
-        const box_size = DISPLAY_BOX_SIZE;
-        const box_pos = Vec2{ .x = 1280 - (padding + box_size.x), .y = padding };
-        self.haathi.drawRect(.{ .position = .{ .x = 1280 - ((padding * 2) + 300), .y = 0 }, .size = .{ .x = 300 + (padding * 2), .y = 720 }, .color = colors.solarized_base0 });
-        self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base1, .radius = 10 });
-        self.drawMessage();
-        const displays = [_]*WaveDisplay{ &self.target_points, &self.output_points, &self.display_points };
-        const cols = [displays.len]Vec4{ colors.solarized_base2, colors.solarized_base03, colors.solarized_base01 };
-        const widths = [displays.len]f32{ 8, 5, 3 };
-        for (displays, cols, widths, 0..) |display, col, w, di| {
-            if (di == 2 and !self.show_display_graph) continue;
-            for (display.points, 0..) |point, i| {
-                const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
-                const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
-                display.display[i] = .{ .x = x, .y = y };
+        {
+            const padding: f32 = DISPLAY_PADDING;
+            const box_size = DISPLAY_BOX_SIZE;
+            const box_pos = Vec2{ .x = 1280 - (padding + box_size.x), .y = padding };
+            self.haathi.drawRect(.{ .position = .{ .x = 1280 - ((padding * 2) + 300), .y = 0 }, .size = .{ .x = 300 + (padding * 2), .y = 720 }, .color = colors.solarized_base0 });
+            self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base1, .radius = 10 });
+            self.drawMessage();
+            const displays = [_]*WaveDisplay{ &self.target_points, &self.output_points, &self.display_points };
+            const cols = [displays.len]Vec4{ colors.solarized_base2, colors.solarized_base03, colors.solarized_base01 };
+            const widths = [displays.len]f32{ 8, 5, 3 };
+            for (displays, cols, widths, 0..) |display, col, w, di| {
+                if (di == 2 and !self.show_display_graph) continue;
+                for (display.points, 0..) |point, i| {
+                    const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
+                    const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
+                    display.display[i] = .{ .x = x, .y = y };
+                }
+                self.haathi.drawPath(.{ .points = display.display[0..], .color = col, .width = w });
             }
-            self.haathi.drawPath(.{ .points = display.display[0..], .color = col, .width = w });
         }
         var hovered_slot: ?usize = if (self.state == .idle) self.state.idle.hovered_slot else null;
         if (hovered_slot == null and self.state == .create_connection) {
@@ -959,6 +1002,17 @@ pub const Game = struct {
         for (self.connections.items) |conn| self.drawConnection(conn, false);
         if (self.temp_connection) |conn| self.drawConnection(conn, true);
         for (self.hovered_connections.items) |ci| self.drawConnection(self.connections.items[ci], true);
+        if (self.state == .create_connection and self.state.create_connection.stem == null) {
+            // draw line from box to mouse.
+            var path = std.ArrayList(Vec2).init(self.arena);
+            const root = self.slots.items[self.state.create_connection.root];
+            path.append(root.rect.position.add(root.rect.size.scale(0.5))) catch unreachable;
+            path.append(self.haathi.inputs.mouse.current_pos) catch unreachable;
+            self.haathi.drawPath(.{
+                .points = path.items[0..],
+                .color = colors.solarized_base1,
+            });
+        }
         for (self.slots.items, 0..) |slot, i| {
             if (slot.component_type) |t| {
                 if (hovered_slot != null and hovered_slot.? == i) {
@@ -1089,5 +1143,97 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
+        if (self.show_tutorial) {
+            const box1_pos = Vec2{ .x = 140, .y = 20 };
+            const box1_size = Vec2{ .x = 900, .y = 340 };
+            self.haathi.drawRect(.{
+                .position = box1_pos,
+                .size = box1_size,
+                .color = colors.solarized_base02,
+                .radius = 12,
+            });
+            var lines: f32 = 0;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_1,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE + TEXT_2_YOFF)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1.8;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_2,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_3,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_4,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_5,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_6,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_7,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_8,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_9,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+            self.haathi.drawText(.{
+                .text = TUTORIAL_10,
+                .position = box1_pos.add(.{ .x = box1_size.x / 2, .y = 30 + TEXT_2_YOFF + (lines * (TEXT_2_SIZE * 1.6)) }),
+                .color = colors.solarized_base2,
+                .style = FONT_2,
+            });
+            lines += 1;
+        }
     }
 };
+
+const TUTORIAL_1 = "The aim of the game is to replicate the waves as shown in the box at the top right";
+const TUTORIAL_2 = "This is done by creating connections between the different components";
+const TUTORIAL_3 = "Additional components are found in the box at the bottom right";
+const TUTORIAL_4 = "Use the mouse to drag these components onto the board";
+const TUTORIAL_5 = "Drag the mouse from one component to another to create a connection";
+const TUTORIAL_6 = "Connections should be to components on the right, or below if in the same row";
+const TUTORIAL_7 = "The desired wave should be connected to the output component";
+const TUTORIAL_8 = "Some components can only have one input, while others can have multiple";
+const TUTORIAL_9 = "Click the verify button to see if you have the correct solution";
+const TUTORIAL_10 = "In the first level, drag sin t -> output";
