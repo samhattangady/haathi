@@ -77,6 +77,7 @@ const wasmString = (ptr) => {
   for (let i = 0; ; i++) {
     const c = String.fromCharCode(bytes[i]);
     if (c == '\0') break;
+    if (c == 'Â') continue;  // hack for getting my ascii shrug into the game...
     str += c;
   }
   return str;

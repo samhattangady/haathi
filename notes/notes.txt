@@ -162,3 +162,8 @@ its connections...
 29 Jun 2023:
 Okay what is the first thing that awe can work on today? It's either
 converting the connections to the component tree. Or some more controls.
+
+---
+
+30 Jun 2023:
+So we have the _toy_ ready. Today we need to make it into a game.

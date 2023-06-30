@@ -28,11 +28,35 @@ const NUM_BUTTON_ROWS = 2;
 const NUM_BUTTON_COLS = 3;
 const COMPONENT_RADIUS = COMPONENT_HEIGHT / 4;
 const HIGHLIGHT_WIDTH = 3;
+const STAGE_SELECT_Y = (DISPLAY_PADDING * 2) + DISPLAY_BOX_SIZE.y;
+const STAGE_SELECT_SIZE = 16;
+const STAGE_RADIUS = 3;
+const STAGES = [_]WaveDisplay{
+    stage(0),
+    stage(1),
+    stage(2),
+    stage(3),
+    stage(4),
+    stage(5),
+    stage(6),
+    stage(7),
+    stage(8),
+    stage(9),
+};
+const MESSAGE_LINE1 = "sine cosine desine";
+const MESSAGE_LINE2_1 = "the fundamental building block";
+const MESSAGE_LINE2_2 = "of the universe is the wave";
+const MESSAGE_LINE3_1 = "just waves all the way down";
+const MESSAGE_LINE3_2 = "";
+const MESSAGE_LINE4_1 = "just waves";
+const MESSAGE_LINE4_2 = "all the way down";
 
 const FONT_1 = "18px JetBrainsMono";
 const TEXT_1_SIZE = 18;
-// const TEXT_1_YOFF = COMPONENT_HEIGHT - ((COMPONENT_HEIGHT - TEXT_1_SIZE) / 2);
 const TEXT_1_YOFF = COMPONENT_HEIGHT - 8;
+const FONT_2 = "16px JetBrainsMono";
+const TEXT_2_SIZE = 16;
+const TEXT_2_YOFF = COMPONENT_HEIGHT - 7;
 
 fn sineWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     var points: [DISPLAY_SIZE]f32 = undefined;
@@ -60,6 +84,81 @@ fn constantWave(scale: f32) [DISPLAY_SIZE]f32 {
     return points;
 }
 
+fn stage(lvl: usize) WaveDisplay {
+    @setEvalBranchQuota(1000000);
+    var wave = WaveDisplay{};
+    switch (lvl) {
+        0 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = (@sin(val));
+            }
+        },
+        1 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = @fabs(@sin(val));
+            }
+        },
+        2 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = @fabs(@cos(val));
+            }
+        },
+        3 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = 0.5 + (@sin(val * 2) * 0.25);
+            }
+        },
+        4 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = -0.5 + (@fabs(@cos(val * 2)) * -0.25);
+            }
+        },
+        5 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = @max(t, @sin(val));
+            }
+        },
+        6 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = (@sin(val) * (1 - t));
+            }
+        },
+        7 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                const sin = 2 * @sin(val * 2);
+                wave.points[i] = @min(@max(-1, sin), 1);
+            }
+        },
+        8 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                const cos2t = @cos(val * 2);
+                wave.points[i] = @min(t, @max(cos2t, -t));
+            }
+        },
+        9 => {
+            for (0..DISPLAY_SIZE) |i| {
+                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                const cos2t = @cos(val * 2) * 0.5;
+                wave.points[i] = @max(@max(0, cos2t), @min(1, @cos(val) * 2));
+            }
+        },
+        else => unreachable,
+    }
+    return wave;
+}
+
 const WaveDisplay = struct {
     points: [DISPLAY_SIZE]f32 = [_]f32{0} ** DISPLAY_SIZE,
     display: [DISPLAY_SIZE]Vec2 = undefined,
@@ -85,6 +184,7 @@ const COMPONENT_NAMES = [NUM_COMPONENTS][]const u8{
     "x (1-t)",
     "avg",
     "output",
+    "debug",
 };
 
 const ComponentType = enum {
@@ -108,6 +208,7 @@ const ComponentType = enum {
     scale_one_minus_t,
     average,
     output_main,
+    display1,
 
     pub fn getSource(self: *const Self) ?*const [DISPLAY_SIZE]f32 {
         return switch (self.*) {
@@ -131,6 +232,7 @@ const ComponentType = enum {
             .scale_one_minus_t,
             .average,
             .output_main,
+            .display1,
             => null,
         };
     }
@@ -157,6 +259,7 @@ const ComponentType = enum {
             .cos_one,
             .cos_two,
             .output_main,
+            .display1,
             => false,
         };
     }
@@ -172,6 +275,8 @@ const ComponentType = enum {
             .cos_half,
             .cos_one,
             .cos_two,
+            .output_main,
+            .display1,
             => false,
             .min,
             .max,
@@ -183,7 +288,6 @@ const ComponentType = enum {
             .scale_one_minus_t,
             .average,
             => true,
-            .output_main => false,
         };
     }
 
@@ -196,6 +300,7 @@ const ComponentType = enum {
             .scale_two_t,
             .scale_one_minus_t,
             .output_main,
+            .display1,
             => true,
             .min,
             .max,
@@ -313,6 +418,10 @@ pub const Component = struct {
                 }
                 for (self.stems) |stem| _ = components[stem].addInput(avg_val);
             },
+            .display1 => {
+                const val = if (self.inputs.len > 0) self.inputs[0] else 0;
+                for (self.stems) |stem| _ = components[stem].addInput(val);
+            },
             else => unreachable,
         }
     }
@@ -322,6 +431,20 @@ const ComponentButton = struct {
     const Self = @This();
     rect: Rect,
     component_type: ComponentType,
+};
+
+const Control = enum {
+    clear,
+    verify,
+    previous_level,
+    next_level,
+};
+
+const ControlButton = struct {
+    const Self = @This();
+    rect: Rect,
+    text: []const u8,
+    control: Control,
 };
 
 const BUTTONS = [3][3]ComponentType{
@@ -349,7 +472,7 @@ const Connection = struct {
 };
 
 const StateData = union(enum) {
-    idle: struct { hovered_button: ?usize = null, hovered_slot: ?usize = null },
+    idle: struct { hovered_button: ?usize = null, hovered_slot: ?usize = null, hovered_control: ?usize = null },
     idle_drag: void,
     button_drag: struct { component_type: ComponentType, hovered_slot: ?usize = null },
     create_connection: struct { root: u8, stem: ?u8 = null },
@@ -358,17 +481,24 @@ const StateData = union(enum) {
 pub const Game = struct {
     const Self = @This();
     haathi: *Haathi,
-    target_points: WaveDisplay,
-    output_points: WaveDisplay,
+    target_points: WaveDisplay = .{},
+    output_points: WaveDisplay = .{},
+    display_points: WaveDisplay = .{},
 
     state: StateData = .{ .idle = .{} },
     update_display: bool = true,
     ticks: u64 = 0,
     temp_connection: ?Connection = null,
-    output_slot_index: usize,
+    show_display_graph: bool = false,
+    stage_index: usize = 0,
+    stage_name_buffer: [16]u8 = undefined,
+    stage_name: []const u8 = undefined,
+    completed_stages: [STAGES.len]bool = [_]bool{false} ** STAGES.len,
+    text_y: f32 = 0,
 
     components: std.ArrayList(Component),
     buttons: std.ArrayList(ComponentButton),
+    controls: std.ArrayList(ControlButton),
     slots: std.ArrayList(ComponentSlot),
     connections: std.ArrayList(Connection),
     hovered_connections: std.ArrayList(usize),
@@ -380,11 +510,6 @@ pub const Game = struct {
     pub fn init(haathi: *Haathi) Self {
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        var target_points = WaveDisplay{};
-        for (0..DISPLAY_SIZE) |i| {
-            var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
-            target_points.points[i] = @fabs(@sin(val));
-        }
         var components = std.ArrayList(Component).init(allocator);
         var buttons = std.ArrayList(ComponentButton).init(allocator);
         {
@@ -425,17 +550,58 @@ pub const Game = struct {
             }
         }
         slots.items[slots.items.len - 1].component_type = .output_main;
+        slots.items[slots.items.len - 2].component_type = .display1;
         var connections = std.ArrayList(Connection).init(allocator);
+        var controls = std.ArrayList(ControlButton).init(allocator);
+        var text_y: f32 = 0;
+        {
+            const level_row_y = STAGE_SELECT_Y + STAGE_SELECT_SIZE + DISPLAY_PADDING;
+            const clear_row_y = level_row_y + 40;
+            text_y = clear_row_y + 50;
+            const x_start = 1280 - DISPLAY_BOX_SIZE.x - DISPLAY_PADDING;
+            const x_end = 1280 - DISPLAY_PADDING;
+            controls.append(.{
+                .rect = .{
+                    .position = .{ .x = x_start, .y = level_row_y },
+                    .size = .{ .x = COMPONENT_WIDTH * 0.4, .y = COMPONENT_HEIGHT },
+                },
+                .text = "<",
+                .control = .previous_level,
+            }) catch unreachable;
+            controls.append(.{
+                .rect = .{
+                    .position = .{ .x = x_end - (COMPONENT_WIDTH * 0.4), .y = level_row_y },
+                    .size = .{ .x = COMPONENT_WIDTH * 0.4, .y = COMPONENT_HEIGHT },
+                },
+                .text = ">",
+                .control = .next_level,
+            }) catch unreachable;
+            controls.append(.{
+                .rect = .{
+                    .position = .{ .x = x_start, .y = clear_row_y },
+                    .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT },
+                },
+                .text = "clear",
+                .control = .clear,
+            }) catch unreachable;
+            controls.append(.{
+                .rect = .{
+                    .position = .{ .x = x_end - (COMPONENT_WIDTH), .y = clear_row_y },
+                    .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT },
+                },
+                .text = "verify",
+                .control = .verify,
+            }) catch unreachable;
+        }
         return .{
             .haathi = haathi,
             .buttons = buttons,
             .slots = slots,
             .components = components,
             .connections = connections,
+            .controls = controls,
             .hovered_connections = std.ArrayList(usize).init(allocator),
-            .target_points = target_points,
-            .output_points = WaveDisplay{},
-            .output_slot_index = slots.items.len - 1,
+            .text_y = text_y,
             .allocator = allocator,
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
@@ -467,6 +633,7 @@ pub const Game = struct {
                 const mouse = self.haathi.inputs.mouse;
                 self.state.idle.hovered_button = null;
                 self.state.idle.hovered_slot = null;
+                self.state.idle.hovered_control = null;
                 self.hovered_connections.clearRetainingCapacity();
                 for (self.buttons.items, 0..) |button, i| {
                     if (button.rect.contains(mouse.current_pos)) {
@@ -480,6 +647,12 @@ pub const Game = struct {
                         break;
                     }
                 }
+                for (self.controls.items, 0..) |control, i| {
+                    if (control.rect.contains(mouse.current_pos)) {
+                        self.state.idle.hovered_control = i;
+                        break;
+                    }
+                }
                 if (mouse.l_button.is_clicked) {
                     if (self.state.idle.hovered_button) |hb| {
                         self.state = .{ .button_drag = .{ .component_type = self.buttons.items[hb].component_type } };
@@ -490,6 +663,9 @@ pub const Game = struct {
                             self.state = .{ .create_connection = .{ .root = @intCast(u8, hs) } };
                             return;
                         }
+                    }
+                    if (self.state.idle.hovered_control) |hc| {
+                        self.triggerControl(self.controls.items[hc].control);
                     }
                     self.state = .idle_drag;
                     return;
@@ -559,9 +735,53 @@ pub const Game = struct {
         }
     }
 
+    fn triggerControl(self: *Self, control: Control) void {
+        switch (control) {
+            .clear => {
+                self.clearSlots();
+            },
+            .verify => {
+                var match = true;
+                for (0..DISPLAY_SIZE) |i| {
+                    if (self.output_points.points[i] != self.target_points.points[i]) {
+                        match = false;
+                        break;
+                    }
+                }
+                if (match) self.completed_stages[self.stage_index] = true;
+            },
+            .previous_level => {
+                if (self.stage_index > 0) {
+                    self.update_display = true;
+                    self.stage_index -= 1;
+                }
+            },
+            .next_level => {
+                if (self.stage_index < STAGES.len - 1) {
+                    self.update_display = true;
+                    self.stage_index += 1;
+                }
+            },
+        }
+    }
+
+    fn clearSlots(self: *Self) void {
+        self.connections.clearRetainingCapacity();
+        for (self.slots.items) |*slot| {
+            if (slot.component_type != null and slot.component_type.?.canDelete())
+                slot.component_type = null;
+        }
+        self.update_display = true;
+    }
+
     fn updateGraphs(self: *Self) void {
         // clear the existing display
         @memset(self.output_points.points[0..], 0);
+        @memset(self.display_points.points[0..], 0);
+        self.target_points = STAGES[self.stage_index];
+        self.show_display_graph = false;
+        self.stage_name = std.fmt.bufPrintZ(self.stage_name_buffer[0..], "wave {d}", .{self.stage_index + 1}) catch unreachable;
+        if (self.stage_index == 9) self.stage_name = "¯\\_(^_^)_/¯";
         self.components.clearRetainingCapacity();
         // create the new components
         {
@@ -589,11 +809,17 @@ pub const Game = struct {
                     const val = source[i];
                     for (component.stems) |stem_idx| _ = self.components.items[stem_idx].addInput(val);
                 }
-                if (component.type.isCalc()) {
+                if (component.type.isCalc() or component.type == .display1) {
                     component.propogateCalculation(self.components.items, i);
                 }
                 if (component.type == .output_main and component.inputs.len > 0) {
                     self.output_points.points[i] = component.inputs[0];
+                }
+                if (component.type == .display1) {
+                    if (component.inputs.len > 0) {
+                        self.display_points.points[i] = component.inputs[0];
+                        self.show_display_graph = true;
+                    }
                 }
             }
         }
@@ -638,16 +864,77 @@ pub const Game = struct {
         self.haathi.drawPath(.{ .points = path.items[0..], .color = color });
     }
 
+    fn drawMessage(self: *Self) void {
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE1,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF },
+            .color = colors.solarized_base2.alpha(0.7),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE2_1,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (1 * (TEXT_2_YOFF)) + 4 },
+            .color = colors.solarized_base2.alpha(0.65),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE2_2,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (2 * (TEXT_2_YOFF)) + 4 },
+            .color = colors.solarized_base2.alpha(0.60),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE3_1,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (3 * (TEXT_2_YOFF)) + 8 },
+            .color = colors.solarized_base2.alpha(0.55),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE3_2,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (4 * (TEXT_2_YOFF)) + 12 },
+            .color = colors.solarized_base2.alpha(0.50),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE4_1,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (5 * (TEXT_2_YOFF)) + 12 },
+            .color = colors.solarized_base2.alpha(0.45),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = MESSAGE_LINE4_2,
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (6 * (TEXT_2_YOFF)) + 12 },
+            .color = colors.solarized_base2.alpha(0.4),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+        self.haathi.drawText(.{
+            .text = "bye",
+            .position = .{ .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2), .y = self.text_y + TEXT_2_YOFF + (8 * (TEXT_2_YOFF)) + 12 },
+            .color = colors.solarized_base2.alpha(0.2),
+            .style = FONT_2,
+            .width = DISPLAY_BOX_SIZE.x,
+        });
+    }
+
     pub fn render(self: *Self) void {
         const padding: f32 = DISPLAY_PADDING;
         const box_size = DISPLAY_BOX_SIZE;
         const box_pos = Vec2{ .x = 1280 - (padding + box_size.x), .y = padding };
         self.haathi.drawRect(.{ .position = .{ .x = 1280 - ((padding * 2) + 300), .y = 0 }, .size = .{ .x = 300 + (padding * 2), .y = 720 }, .color = colors.solarized_base0 });
         self.haathi.drawRect(.{ .position = box_pos, .size = box_size, .color = colors.solarized_base1, .radius = 10 });
-        const displays = [_]*WaveDisplay{ &self.target_points, &self.output_points };
-        const cols = [displays.len]Vec4{ colors.solarized_base2, colors.solarized_base03 };
-        const widths = [displays.len]f32{ 8, 3 };
-        for (displays, cols, widths) |display, col, w| {
+        self.drawMessage();
+        const displays = [_]*WaveDisplay{ &self.target_points, &self.output_points, &self.display_points };
+        const cols = [displays.len]Vec4{ colors.solarized_base2, colors.solarized_base03, colors.solarized_base01 };
+        const widths = [displays.len]f32{ 8, 5, 3 };
+        for (displays, cols, widths, 0..) |display, col, w, di| {
+            if (di == 2 and !self.show_display_graph) continue;
             for (display.points, 0..) |point, i| {
                 const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
                 const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
@@ -659,16 +946,29 @@ pub const Game = struct {
         if (hovered_slot == null and self.state == .create_connection) {
             hovered_slot = self.state.create_connection.root;
         }
-        for (self.slots.items, 0..) |slot, i| {
-            if (hovered_slot != null and hovered_slot.? == i) {
+        for (self.slots.items) |slot| {
+            if (slot.component_type == null) {
                 self.haathi.drawRect(.{
-                    .position = slot.rect.position.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
-                    .size = slot.rect.size.add(.{ .x = HIGHLIGHT_WIDTH * 2, .y = HIGHLIGHT_WIDTH * 2 }),
-                    .color = colors.solarized_base01,
-                    .radius = COMPONENT_RADIUS + HIGHLIGHT_WIDTH,
+                    .position = slot.rect.position,
+                    .size = slot.rect.size,
+                    .color = colors.solarized_base2,
+                    .radius = COMPONENT_RADIUS,
                 });
             }
+        }
+        for (self.connections.items) |conn| self.drawConnection(conn, false);
+        if (self.temp_connection) |conn| self.drawConnection(conn, true);
+        for (self.hovered_connections.items) |ci| self.drawConnection(self.connections.items[ci], true);
+        for (self.slots.items, 0..) |slot, i| {
             if (slot.component_type) |t| {
+                if (hovered_slot != null and hovered_slot.? == i) {
+                    self.haathi.drawRect(.{
+                        .position = slot.rect.position.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
+                        .size = slot.rect.size.add(.{ .x = HIGHLIGHT_WIDTH * 2, .y = HIGHLIGHT_WIDTH * 2 }),
+                        .color = colors.solarized_base01,
+                        .radius = COMPONENT_RADIUS + HIGHLIGHT_WIDTH,
+                    });
+                }
                 self.haathi.drawRect(.{
                     .position = slot.rect.position,
                     .size = slot.rect.size,
@@ -680,13 +980,6 @@ pub const Game = struct {
                     .position = slot.rect.position.add(.{ .x = slot.rect.size.x / 2, .y = TEXT_1_YOFF }),
                     .color = colors.solarized_base3,
                     .style = FONT_1,
-                });
-            } else {
-                self.haathi.drawRect(.{
-                    .position = slot.rect.position,
-                    .size = slot.rect.size,
-                    .color = colors.solarized_base2,
-                    .radius = COMPONENT_RADIUS,
                 });
             }
         }
@@ -713,6 +1006,72 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
+        var hovered_control: ?usize = if (self.state == .idle) self.state.idle.hovered_control else null;
+        for (self.controls.items, 0..) |control, i| {
+            if (hovered_control != null and hovered_control.? == i) {
+                self.haathi.drawRect(.{
+                    .position = control.rect.position.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
+                    .size = control.rect.size.add(.{ .x = HIGHLIGHT_WIDTH * 2, .y = HIGHLIGHT_WIDTH * 2 }),
+                    .color = colors.solarized_base01,
+                    .radius = COMPONENT_RADIUS + HIGHLIGHT_WIDTH,
+                });
+            }
+            self.haathi.drawRect(.{
+                .position = control.rect.position,
+                .size = control.rect.size,
+                .color = colors.solarized_base2,
+                .radius = COMPONENT_RADIUS,
+            });
+            self.haathi.drawText(.{
+                .text = control.text,
+                .position = control.rect.position.add(.{ .x = control.rect.size.x / 2, .y = TEXT_1_YOFF }),
+                .color = colors.solarized_base00,
+                .style = FONT_1,
+            });
+        }
+        self.haathi.drawText(.{
+            .text = self.stage_name,
+            .position = .{
+                .x = 1280 - DISPLAY_PADDING - (DISPLAY_BOX_SIZE.x / 2),
+                .y = self.controls.items[0].rect.position.y + TEXT_1_YOFF,
+            },
+            .color = colors.solarized_base2,
+            .style = FONT_1,
+        });
+        {
+            // stage select
+            const x_start = 1280 - DISPLAY_PADDING - DISPLAY_BOX_SIZE.x;
+            const x_end = 1280 - DISPLAY_PADDING;
+            const stage_padding: f32 = ((x_end - x_start) - (@floatFromInt(f32, STAGES.len) * STAGE_SELECT_SIZE)) / @floatFromInt(f32, STAGES.len - 1);
+            for (0..STAGES.len) |i| {
+                const pos = Vec2{
+                    .x = x_start + ((stage_padding + STAGE_SELECT_SIZE) * @floatFromInt(f32, i)),
+                    .y = STAGE_SELECT_Y,
+                };
+                if (i == self.stage_index) {
+                    self.haathi.drawRect(.{
+                        .position = pos.add(.{ .x = -HIGHLIGHT_WIDTH, .y = -HIGHLIGHT_WIDTH }),
+                        .size = .{ .x = STAGE_SELECT_SIZE + HIGHLIGHT_WIDTH * 2, .y = STAGE_SELECT_SIZE + HIGHLIGHT_WIDTH * 2 },
+                        .color = colors.solarized_base01,
+                        .radius = STAGE_RADIUS + HIGHLIGHT_WIDTH,
+                    });
+                }
+                self.haathi.drawRect(.{
+                    .position = pos,
+                    .size = .{ .x = STAGE_SELECT_SIZE, .y = STAGE_SELECT_SIZE },
+                    .color = colors.solarized_base2,
+                    .radius = STAGE_RADIUS,
+                });
+                if (self.completed_stages[i]) {
+                    self.haathi.drawRect(.{
+                        .position = pos.add(.{ .x = HIGHLIGHT_WIDTH, .y = HIGHLIGHT_WIDTH }),
+                        .size = .{ .x = STAGE_SELECT_SIZE - HIGHLIGHT_WIDTH * 2, .y = STAGE_SELECT_SIZE - HIGHLIGHT_WIDTH * 2 },
+                        .color = colors.solarized_base01,
+                        .radius = STAGE_RADIUS,
+                    });
+                }
+            }
+        }
         if (self.state == .button_drag) {
             const size = Vec2{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT };
             var pos = self.haathi.inputs.mouse.current_pos.add(size.scale(-0.5));
@@ -730,8 +1089,5 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
-        for (self.connections.items) |conn| self.drawConnection(conn, false);
-        if (self.temp_connection) |conn| self.drawConnection(conn, true);
-        for (self.hovered_connections.items) |ci| self.drawConnection(self.connections.items[ci], true);
     }
 };
