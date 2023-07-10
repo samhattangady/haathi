@@ -753,7 +753,7 @@ pub const Game = struct {
                 self.temp_connection = null;
                 for (self.slots.items, 0..) |slot, i| {
                     if (slot.component_type == null) continue;
-                    if (!slot.component_type.acceptInput()) continue;
+                    if (!slot.component_type.?.acceptInput()) continue;
                     if (slot.rect.contains(mouse.current_pos)) {
                         if (i > data.root) {
                             self.state.create_connection.stem = @intCast(u8, i);
