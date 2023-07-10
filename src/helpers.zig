@@ -224,3 +224,13 @@ pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
     };
     c.debugPrint(message.ptr);
 }
+
+pub fn polygonContainsPoint(polygon: []Vec2, point: Vec2, bbox: ?Rect) bool {
+    if (bbox) |box| {
+        if (!box.contains(point)) return false;
+    }
+    var count: usize = 0;
+    _ = polygon;
+    _ = count;
+    return false;
+}

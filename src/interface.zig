@@ -6,6 +6,7 @@ pub extern fn milliTimestamp() i64;
 pub extern fn fillStyle(color: [*]const u8) void;
 pub extern fn strokeStyle(color: [*]const u8) void;
 pub extern fn beginPath() void;
+pub extern fn closePath() void;
 pub extern fn fill() void;
 pub extern fn stroke() void;
 pub extern fn moveTo(x: f32, y: f32) void;

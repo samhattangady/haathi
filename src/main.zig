@@ -1,7 +1,11 @@
 const std = @import("std");
 const c = @import("interface.zig");
 const Haathi = @import("haathi.zig").Haathi;
-const Game = @import("synthelligence.zig").Game;
+const build_options = @import("build_options");
+const Game = switch (build_options.game) {
+    .synthelligence => @import("synthelligence.zig").Game,
+    .hiveminder => @import("hiveminder.zig").Game,
+};
 const helpers = @import("helpers.zig");
 
 var haathi: Haathi = undefined;
@@ -13,9 +17,8 @@ var start_ticks: u64 = 0;
 export fn init() void {
     start_ticks = helpers.milliTimestamp();
     haathi = Haathi.init();
-    c.debugPrint("haathi init doen");
     game = Game.init(&haathi);
-    c.debugPrint("game init doen");
+    game.setup();
 }
 
 export fn keyDown(code: u32) void {

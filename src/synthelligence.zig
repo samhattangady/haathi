@@ -902,7 +902,7 @@ pub const Game = struct {
         const stem = self.slots.items[connection.stem].rect;
         path.append(root.position.add(root.size.scale(0.5))) catch unreachable;
         path.append(stem.position.add(stem.size.scale(0.5))) catch unreachable;
-        self.haathi.drawPath(.{ .points = path.items[0..], .color = color });
+        self.haathi.drawPoly(.{ .points = path.items[0..], .color = color });
     }
 
     fn drawMessage(self: *Self) void {

@@ -84,7 +84,19 @@ pub const Haathi = struct {
                     for (path.points) |point| {
                         c.lineTo(point.x, point.y);
                     }
+                    if (path.closed) c.closePath();
                     c.stroke();
+                },
+                .poly => |poly| {
+                    poly.color.toHexRgba(color_buffer[0..]);
+                    c.fillStyle(color_buffer[0..].ptr);
+                    c.beginPath();
+                    c.moveTo(poly.points[0].x, poly.points[0].y);
+                    for (poly.points) |point| {
+                        c.lineTo(point.x, point.y);
+                    }
+                    c.closePath();
+                    c.fill();
                 },
                 .text => |text| {
                     text.color.toHexRgba(color_buffer[0..]);
@@ -105,6 +117,9 @@ pub const Haathi = struct {
     pub fn drawPath(self: *Self, path: DrawPathOptions) void {
         self.drawables.append(.{ .path = path }) catch unreachable;
     }
+    pub fn drawPoly(self: *Self, poly: DrawPolyOptions) void {
+        self.drawables.append(.{ .poly = poly }) catch unreachable;
+    }
     pub fn drawText(self: *Self, text: DrawTextOptions) void {
         self.drawables.append(.{ .text = text }) catch unreachable;
     }
@@ -114,6 +129,7 @@ pub const Drawable = union(enum) {
     rect: DrawRectOptions,
     path: DrawPathOptions,
     text: DrawTextOptions,
+    poly: DrawPolyOptions,
 };
 
 pub const DrawRectOptions = struct {
@@ -127,6 +143,12 @@ pub const DrawPathOptions = struct {
     points: []Vec2,
     color: Vec4,
     width: f32 = 5,
+    closed: bool = false,
+};
+
+pub const DrawPolyOptions = struct {
+    points: []Vec2,
+    color: Vec4,
 };
 
 const TextAlignment = enum {
