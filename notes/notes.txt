@@ -167,3 +167,87 @@ converting the connections to the component tree. Or some more controls.
 
 30 Jun 2023:
 So we have the _toy_ ready. Today we need to make it into a game.
+
+---
+
+10 Jul 2023:
+Working on hiveminder. We have the basic hex grid ready. Now we have to ask
+the question, what is the experience of a city builder that we are looking to
+distill? What is it about the genre that we think should be captured. Forget
+all the other things that you know a bout games right now. Just focus on that
+base.
+
+Growth is definitely one. The feeling of accomplishment over watching the
+thing grow.
+Balance of resources. You need population to fill jobs. But houses require
+maintenance. More houses means that a large part of the new population will go
+towards maintenance rather than industry.
+
+What are the decisions that you take? And what are the decisions that are out
+of your hands?
+- What to build where. In the case of a beehive, the plots are all already
+  fixed. All you just decide what needs to be built.
+
+What are the resources that we are balancing?
+- Population
+- Food
+- Jobs
+
+What are the jobs?
+- Food / honey collection
+- Builders
+- Looking after youngers
+
+What are the rooms?
+- Queen
+- Queen minders / look after youngers
+- Food Collectors
+- Builders
+- Maintainers
+- Storage
+- Sleep
+- Incubate
+
+What are the other mechanics
+- Frustration - if bees are working too much, their frustration will rise so
+  you need to have enough bees in all the workstations
+  If there is too much frustration, then the bees will revolt (and for now,
+  you lose)
+- Hunger - If there isn't enough honey, bees will eventually die
+
+I think that's enough to get started? I mean, it's honestly too much to get
+started, but we still, at some point do need to get started.
+
+What's the first step, what do we need to build first? Damn, that's hard to
+figure.
+
+So let's start off with having a simulated working hive. One queen at the
+center, one of each room around. And then figure out. Okay. Okay. Okay.
+
+Where do the bees sleep?
+
+Okay, so the way that each bee works:
+- request job
+- if available: perform job for JOB_LENGTH time
+- request food (consume if available)
+- request rest (
+
+The way jobs work:
+Each job requires a room. That room has a fixed number of slots. When a bee
+requests job, if any jobroom has on opening, the bee will get assigned to that
+job. Based on the job, some stats of the hive will be modified.
+
+Food:
+Every FOOD_DISTRIB cycle, food is equally distributed amongst all bees up to
+MAX_FOOD per bee. So if there is not enough total food, each bee will get
+equal amount. (Will this lead to a mass death at one point?)
+Or we will give MIN_FOOD to each bee based on need until food runs out.
+
+Rest:
+If there is a job to be done, bees will do it. If there is none, they will
+rest.
+(How to balance this so that overworked bees are not at the head of the queue
+for jobs?)
+
+So doing a job leads to bee.rest-- and resting leads to bee.rest++
+Over time, bee.health--. When they eat, bee.health++

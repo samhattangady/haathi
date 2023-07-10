@@ -225,12 +225,41 @@ pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
     c.debugPrint(message.ptr);
 }
 
-pub fn polygonContainsPoint(polygon: []Vec2, point: Vec2, bbox: ?Rect) bool {
+/// Checks if a ray in +ve x direction from point intersects with line v0-v1
+pub fn xRayIntersects(point: Vec2, v0: Vec2, v1: Vec2) bool {
+    // if point.y is not between v0.y and v1.y, no intersection
+    if (!((point.y >= @min(v0.y, v1.y)) and (point.y <= @max(v0.y, v1.y)))) return false;
+    // if point.x is greater than both verts, no intersection
+    if (point.x > v0.x and point.x > v1.x) return false;
+    // if point.x is less than both verts, intersection
+    if (point.x <= v0.x and point.x <= v1.x) return true;
+    // point.x is between v0.x and v1.x
+    // get the point of intersection
+    const y_fract = (point.y - v0.y) / (v1.y - v0.y);
+    const x_intersect = lerp(v0.x, v1.x, y_fract);
+    // if intersection point is more than point.x, intersection
+    return x_intersect >= point.x;
+}
+
+pub fn polygonContainsPoint(verts: []const Vec2, point: Vec2, bbox: ?Rect) bool {
     if (bbox) |box| {
         if (!box.contains(point)) return false;
     }
+    // counts the number of intersections between edges and a line from point towards +x
     var count: usize = 0;
-    _ = polygon;
-    _ = count;
-    return false;
+    for (verts, 0..) |v0, i| {
+        // var v1 = verts[0];
+        // if (i < verts.len - 1) {
+        //     v1 = verts[i + 1];
+        // }
+        const v1 = if (i < verts.len - 1) verts[i + 1] else verts[0];
+        // const v1 = if (i == verts.len - 1) verts[0] else verts[i + i];
+        if (xRayIntersects(point, v0, v1)) count += 1;
+    }
+    return @mod(count, 2) == 1;
+}
+
+/// t varies from 0 to 1. (Can also be outside the range for extrapolation)
+pub fn lerp(start: f32, end: f32, t: f32) f32 {
+    return (start * (1.0 - t)) + (end * t);
 }

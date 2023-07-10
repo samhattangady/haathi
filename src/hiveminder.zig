@@ -55,7 +55,87 @@ pub const Cell = struct {
             .position = .{ .x = self.points[3].x, .y = self.points[5].y },
             .size = .{ .x = self.points[0].x - self.points[3].x, .y = self.points[1].y - self.points[5].y },
         };
-        return bounding_box.contains(pos);
+        return helpers.polygonContainsPoint(self.points[0..], pos, bounding_box);
+    }
+};
+
+pub const Role = enum {
+    babysitting,
+    food_collection,
+    building,
+    maintaining,
+};
+
+pub const Job = struct {
+    const Self = @This();
+    role: Role,
+    address: Vec2i,
+    // slot within the address
+    index: u8,
+    // index of the bee doing the job
+    occupied: ?u16 = null,
+    // when the job was created
+    ticks_created: u64 = 0,
+    // when the job was started
+    ticks_started: u64 = 0,
+
+    pub fn update(self: *Self) void {
+        _ = self;
+    }
+};
+
+pub const Room = struct {
+    room: enum {
+        queen,
+        babysitting,
+        food_collection,
+        building,
+        maintaining,
+        rest,
+        storage,
+        incubator,
+    },
+    address: Vec2i,
+};
+
+pub const Bee = struct {
+    const Self = @This();
+    /// slowly goes up, eventually bee will die.
+    age: u8 = 0,
+    /// health goes up and down based on food consumption
+    health: u8 = 255,
+    /// rest goes up and down based on time spent on job and rest
+    rest: u8 = 255,
+    position: Vec2 = .{},
+};
+
+pub const Hive = struct {
+    const Self = @This();
+    food: usize = 0,
+    ticks: u64 = 0,
+    bees: std.ArrayList(Bee),
+    jobs: std.ArrayList(Job),
+    rooms: std.ArrayList(Room),
+
+    pub fn init(allocator: std.mem.Allocator) Self {
+        var self = Self{
+            .bees = std.ArrayList(Bee).init(allocator),
+            .jobs = std.ArrayList(Job).init(allocator),
+            .rooms = std.ArrayList(Room).init(allocator),
+        };
+        self.setupHive();
+    }
+
+    pub fn deinit(self: *Self) void {
+        self.bees.deinit();
+        self.jobs.deinit();
+        self.rooms.deinit();
+    }
+
+    pub fn update(self: *Self, ticks: u64) void {
+        // add a tick to each running job
+        for (self.jobs.items) |*job| job.update(ticks);
+        // check all the current jobs, and see if they are done.
     }
 };
 
@@ -75,7 +155,7 @@ pub const Game = struct {
     pub fn init(haathi: *Haathi) Self {
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        return .{
+        var self = Self{
             .cells = std.ArrayList(Cell).init(allocator),
             .cells_address = std.AutoHashMap(Vec2i, usize).init(allocator),
             .highlighted = std.ArrayList(usize).init(allocator),
@@ -84,6 +164,8 @@ pub const Game = struct {
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
         };
+        self.setup();
+        return self;
     }
 
     pub fn deinit(self: *Self) void {
@@ -92,7 +174,7 @@ pub const Game = struct {
         self.highlighted.deinit();
     }
 
-    pub fn setup(self: *Self) void {
+    fn setup(self: *Self) void {
         self.initCells();
     }
 
