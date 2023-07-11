@@ -131,6 +131,10 @@ pub const Vec2i = struct {
     pub fn lengthSqr(v: *const Self) f32 {
         return v.toVec2().lengthSqr();
     }
+
+    pub fn equal(v: *const Self, v1: Self) bool {
+        return v.x == v1.x and v.y == v1.y;
+    }
 };
 
 pub const Vec3 = struct {

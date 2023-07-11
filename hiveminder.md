@@ -35,3 +35,20 @@ just drawing a hex grid, and the ability to select cells within that.
 The biggest concern I am seeing is that setting up the most basic version / prototype seems like it
 will be a majority of the work, and I will not be able to see how the whole idea works until enough
 of it is set up. So there may not be much time / opportunity to iterate based on that.
+
+---
+
+### 11 Jul 2023
+I feel like I am just sliding down the Dunning-Kruger slope today. I thought I knew how to go about
+things yesterday, but for the most part I had to rethink a lot of things once it came down to the
+details. So most of the day was just spent ideating and coding.
+
+The big issue with such system based games is that until enough systems are set up, there is no
+real scope to get anything running. So even just figuring out what was the smallest workable
+thing I could get up and running was a challenge.
+
+We have something now. I think atleast some of the systems are in place. It's not exactly working
+correctly, but that's an issue to sort out tomorrow.
+
+I have a feeling I am yet to reach the minima on that Dunning Kruger curve. Let's hope that's not
+the case.  ¯\\_(ツ)_/¯ 

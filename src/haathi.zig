@@ -68,12 +68,13 @@ pub const Haathi = struct {
                 .rect => |rect| {
                     rect.color.toHexRgba(color_buffer[0..]);
                     c.fillStyle(color_buffer[0..].ptr);
+                    const position = if (rect.centered) rect.position.add(rect.size.scale(-0.5)) else rect.position;
                     if (rect.radius) |radius| {
                         c.beginPath();
-                        c.roundRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y, radius);
+                        c.roundRect(position.x, position.y, rect.size.x, rect.size.y, radius);
                         c.fill();
                     } else {
-                        c.fillRect(rect.position.x, rect.position.y, rect.size.x, rect.size.y);
+                        c.fillRect(position.x, position.y, rect.size.x, rect.size.y);
                     }
                 },
                 .path => |path| {
@@ -137,6 +138,8 @@ pub const DrawRectOptions = struct {
     size: Vec2,
     color: Vec4,
     radius: ?f32 = null,
+    /// centers the rect at position.
+    centered: bool = false,
 };
 
 pub const DrawPathOptions = struct {

@@ -209,9 +209,9 @@ What are the rooms?
 - Incubate
 
 What are the other mechanics
-- Frustration - if bees are working too much, their frustration will rise so
+- exhaustion - if bees are working too much, their exhaustion will rise so
   you need to have enough bees in all the workstations
-  If there is too much frustration, then the bees will revolt (and for now,
+  If there is too much exhaustion, then the bees will revolt/die (and for now,
   you lose)
 - Hunger - If there isn't enough honey, bees will eventually die
 
@@ -251,3 +251,158 @@ for jobs?)
 
 So doing a job leads to bee.rest-- and resting leads to bee.rest++
 Over time, bee.health--. When they eat, bee.health++
+
+---
+
+11 Jul 2023:
+I think that we had stopped in the middle of doing something yesterday. So
+lets find out what that was and then continue to do that one.
+
+As expected, we are on the toughest part of the thing, and now we have to do
+that before we even had the chance to warm up. Okay. Okay.
+
+So how does the Hive.update() method work?
+There are three things that need to be done.
+We need to check all the rooms if they have any jobs requested, and then add
+those to the list.
+We need to check all jobs. If they are unassigned, then we need to assign
+them. If they are completed, we need to mark them as compete, remove from job
+list, notify the room, and mark the bee as free.
+We need to check all bees. If they are not working, based on priority system,
+we need to feed them, rest them, and then assign them to job.
+
+One big concern that I have right now is how to handle the indexes and things.
+A lot of things will be constantly moving around, and being added and removed
+from lists all the time. So we need to make sure that we take care of those
+indices not going stale.
+
+With jobs, how should it work? Does the job request a bee, or does the bee
+request a job. In the sense that who's update function will be taking care of
+that? Maybe we can use the jobs, so that if there is a bee free, we know that
+it is not doing a job. But the issue is that they wont be able to eat then.
+
+So we probably will have to have more than three sets of iterations.
+
+So let's then lay that out again.
+Iterate through all the assigned_jobs - if complete, mark as complete and
+update the room.
+Iterate through all the bees - if unassigned, give them food.
+Iterate through all the rooms - add to job_requests list if available.
+Iterate through all the job_requests - assign bees
+Iterate through all the bees - if unassigned, give them rest
+
+That might be one way of doing it.
+Another way would be to have multiple lists of bees (or a single list with
+flag so that we only iterate through the ones we need)
+The lists would be - working, eating, resting, waiting, moving
+
+One big question that we may need to answer now is whether we care about
+placements of things, and movements of bees. Or whether we just have global
+and everything. So the bee does not have to go to the room to start the job.
+
+Honestly, I really want to have the movement / placement matter, though that
+might require a lot of optimization work.
+
+I think we should start off with that. It should be easier to remove that
+feature by setting speed as infinite or something along those lines that it
+would be to add it in later.
+
+So how would the loops work if we have separate lists for bees in different
+states?
+
+iter assigned_jobs - if done, move corresponding bees to waiting, and room to
+                     free
+iter moving bees - if reached, move to corresponding state
+iter eating,resting bees - check if they are done - move to waiting
+iter waiting bees - if hungry - set moving to eating
+                    if jobs available - set moving to job
+                    else set moving to rest
+iter rooms - if there is slot, add to job_requests
+we shouldn't need to iter job_requests - waiting_bees should take care of
+that.
+
+Okay, that looks good to me. I think it might be the correct order of loops as
+well.
+Cool lets do it.
+Do we need separate lists for assigned jobs and requests? I think we should be
+okay with one list for now. Can split it later if required.
+
+I think the MVP should start off without aging and incubation. Incubation will
+require bees carrying honey from storage to the incubator.
+
+How do we store what the job is in the bee? This is for the moving bees.
+Ideally it would be a job index. Or maybe if a bee takes up a job, it can hold
+all the info about it. It would make the bee struct larger, but it should be
+okay I think.
+It's getting a little confusing. So there would be jobs like maintenance. So a
+bee would be assigned that job. Then that would need to have the bee move to
+different cells to fix it. Similarly, when a bee is collecting, it will have
+food, then it will have to move to a place to store that.
+
+I think maybe we shouldn't be so focussed on keeping the bee struct tiny.
+There might be more value in keeping things neat as an implementation.
+
+So what all does the bee need to know? I think it should keep the job in
+itself.
+Then there should be "advertisements", where all bees nearby are signalled,
+and they can pick up those advertisements, and then go and do that job. For
+example, a storage room will advertise that it is free. And a collector bee
+can come and store its honey there. Or any room will advertise that it is
+damaged, and a maintenance bee will come and look after it. 
+
+I think I need to be thinking buch more in terms of systems here for the
+implementation. Like the Sims video. So at any point, a bee will be recieving
+ads. Then based on its needs it can go and try to fulfill its needs. So for
+example, if a bee is hungry, or it needs to do incubation, it will respond to
+storage.food_available ads. Does that make sense?
+
+So then what would the different ads be?
+- storage:food_available
+- storage:space_available
+- rest:slot_available
+- room:maintenance_required
+- incubator:food_required
+- incubator:attention_required
+- incubator:egg_required
+- queen:attention_required
+- queen:egg_available
+- room:construction_required
+- collection:bee_required
+
+And then maybe a room would respond to that requirement. So if
+storage:space_availble signal is heard, then a nearby collection room will
+need to add a job requesting a bee to collect and then fill up that space.
+So if each ad is responded to only once, then we should be able to make that
+work.
+
+So a storage:space_available ad would get converted into a
+collection:bee_required. Then a bee would take up that second ad, and set its
+own job to collect, with a destination as that storage:space.
+
+Do we need another resource? Wax? For building and maintenance? Maybe later.
+
+Okay, so with this version of things, the job is attached to the bee. And
+resting and eating will also be a job. moving and waiting can be bools
+
+So now again, how would the hive.update look like?
+
+iter bees - move if required. see if job is complete.
+            if job is complete
+                set bee.job to null
+                bee.waiting to true
+                update room that slot is now open
+iter rooms - create ads
+iter rooms - consume ads, maybe create more ads
+iter bees - consume ads
+
+So if there is a collection job, there is room, destination and target? The
+bee should go to the collection room, then go off map, and then come to the
+storage room.
+Similarly, incubation task will be go to babysitting room, go to storage, go
+to incubation room.
+I imagine there might be jobs where there are more also. So how to handle
+that? We could just have an array there. Is that the goal though? I am just
+trying to think if there is another way to do this.
+
+Okay for now it's assumed that there will only be one waypoint. I think we can
+just carry that through for now.
