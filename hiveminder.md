@@ -52,3 +52,10 @@ correctly, but that's an issue to sort out tomorrow.
 
 I have a feeling I am yet to reach the minima on that Dunning Kruger curve. Let's hope that's not
 the case.  ¯\\_(ツ)_/¯ 
+
+---
+
+### 12 Jul 2023
+It's not bad. I think we have most of the basic systems up and running now, which is a decent place
+to be at this point. Tomorrow, we actually add the interactions, and see what are the things that
+need to be changed and what are the interactions that make sense.

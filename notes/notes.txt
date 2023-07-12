@@ -436,3 +436,11 @@ Also I wonder whether we should be having more data in the room? a union most
 likely
 
 eee. This actually works kinda fun to watch. Lets commit.
+
+So the next thing I want is priority systems. Right now the last bee on the
+list never gets to eat. Lets fix that.
+Okay. That's okay now.
+Next is incubator.
+
+Man we really need to clean up the whole slots, signals and all. Atleast I
+think so.
