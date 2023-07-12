@@ -406,3 +406,33 @@ trying to think if there is another way to do this.
 
 Okay for now it's assumed that there will only be one waypoint. I think we can
 just carry that through for now.
+
+---
+
+12 Jul 2023:
+We finally got something to see on screen yesterday, and it was the last thing
+that we did. So for today, we need to actually get it to work in the way that
+we would like. I think the scale of the prototype we have up is correct
+thouhg. We need to start off by observing exactly what is happening.
+
+So exactly how should the first few ticks go?
+- Storage signal that there is space available
+- Collection consume that, and request a bee for collection
+- Bee consumes that and goes to collect. When they come back, they should
+  update the room to have more food
+
+Okay damn, that's pretty cool. I think we need a slightly more robust system
+of knowing when things need to be signalled and cleared etc. For example, when
+the collection room consumes a storage_space_available signal, it shouldn't
+decrement the live_signal_count because we don't want another signal to be
+emitted until it's all done.
+
+Though now that I think about it, that could cause issues, the storage room
+should always have 8 live signals. One for each slot. So then we cant just use
+live_signal count as a measure. We need to be more specific and have each slot
+haveits own lsignal bool.
+
+Also I wonder whether we should be having more data in the room? a union most
+likely
+
+eee. This actually works kinda fun to watch. Lets commit.

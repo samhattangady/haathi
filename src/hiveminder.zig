@@ -10,14 +10,24 @@ const Vec2i = helpers.Vec2i;
 const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
 const FONT_1 = "18px JetBrainsMono";
+const FONT_2 = "12px JetBrainsMono";
 const HEX_SCALE = 30;
 const HIVE_SIZE = 7;
 const HIVE_ORIGIN = Vec2{ .x = 1280 / 2, .y = 720 / 2 };
 const NUM_SLOTS = 8;
-const BEE_TRAVEL_SPEED = 5;
-const POLLEN_WAYPOINT = Vec2i{ .x = 0, .y = -30 };
+const BEE_TRAVEL_SPEED = 0.25;
+const BEE_REACH_DISTANCE_SQR = HEX_SCALE * 0.2;
+const POLLEN_WAYPOINT = Vec2i{ .x = 8, .y = -12 };
 /// number of ticks between reduction of health / rest for bees
-const BEE_TICK_RATE = 300;
+const BEE_TICK_RATE = 100;
+const BEE_SPEED_VARIATION = 0.2;
+const PRINT_F_DEBUG = false;
+const BEE_STATUS_BAR_HEIGHT = 5;
+const BEE_STATUS_BAR_WIDTH = 80;
+const BEE_HEALTH_STATUS_X = 1280 - BEE_STATUS_BAR_WIDTH - BEE_STATUS_BAR_WIDTH - 20;
+const BEE_REST_STATUS_X = 1280 - BEE_STATUS_BAR_WIDTH - 10;
+const NUM_BEES = 100;
+const DELTA_T_CAP = 200;
 
 const Address = Vec2i;
 
@@ -39,6 +49,23 @@ const NEIGHBOURS_1 = [6]Vec2i{
     .{ .x = 0, .y = -2 },
 };
 
+const NEIGHBOURS_2 = [12]Vec2i{
+    .{ .x = 0, .y = 4 },
+    .{ .x = 1, .y = 3 },
+    .{ .x = 2, .y = 2 },
+    .{ .x = 2, .y = 0 },
+    .{ .x = 2, .y = -2 },
+    .{ .x = 1, .y = -3 },
+    .{ .x = 0, .y = -4 },
+    .{ .x = -1, .y = -3 },
+    .{ .x = -2, .y = -2 },
+    .{ .x = -2, .y = 0 },
+    .{ .x = -2, .y = 2 },
+    .{ .x = -1, .y = 3 },
+};
+
+const NEIGHBOURS = NEIGHBOURS_1 ++ NEIGHBOURS_2;
+
 // Hex Indexing.
 // Our hexes are drawn with one set of parallel edges parallel to the x axis
 // The way that we chose to do hex indexing is:
@@ -50,6 +77,7 @@ const NEIGHBOURS_1 = [6]Vec2i{
 pub const Cell = struct {
     const Self = @This();
     points: [6]Vec2,
+    address: Address = .{},
 
     pub fn init(address: Vec2i) Self {
         var self: Self = undefined;
@@ -90,11 +118,11 @@ pub const Role = enum {
     building,
     maintaining,
     eating,
-    resting,
+    rest,
 
     pub fn ticksLength(self: *const Self) u64 {
         return switch (self.*) {
-            .collection => 0,
+            .collection => 10,
             else => 100,
         };
     }
@@ -116,7 +144,8 @@ pub const Room = struct {
     constructed: u8 = 0,
     address: Vec2i,
     slots_available: [NUM_SLOTS]bool = [_]bool{true} ** NUM_SLOTS,
-    live_signal_count: u8 = 0,
+    /// flag if that slot has already released a signal.
+    slots_signals: [NUM_SLOTS]bool = [_]bool{false} ** NUM_SLOTS,
 
     pub fn canConsume(self: *const Self, signal: SignalType) bool {
         return switch (self.room) {
@@ -130,6 +159,7 @@ pub const Room = struct {
         if (self.room == .collection and signal.signal == .storage_space_available) {
             for (self.slots_available, 0..) |avail, i| {
                 if (avail) {
+                    self.slots_signals[i] = true;
                     return Signal{
                         .signal = .collection_bee_required,
                         .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
@@ -145,6 +175,14 @@ pub const Room = struct {
     pub fn slotCount(self: *const Self) u8 {
         var count: u8 = 0;
         for (self.slots_available) |slot| {
+            if (slot) count += 1;
+        }
+        return count;
+    }
+
+    pub fn liveSignalCount(self: *const Self) u8 {
+        var count: u8 = 0;
+        for (self.slots_signals) |slot| {
             if (slot) count += 1;
         }
         return count;
@@ -190,7 +228,7 @@ pub const Job = struct {
         if (self.waypoint == null and self.destination == null) return .at_destination;
         if (self.waypoint) |_| {
             if (self.ticks_waypoint_reached == 0) return .room_to_waypoint;
-            return .waypoint_to_destination;
+            if (self.ticks_destination_reached == 0) return .waypoint_to_destination;
         }
         if (self.destination) |_| {
             if (self.ticks_destination_reached == 0) return .room_to_destination;
@@ -264,6 +302,7 @@ pub const Bee = struct {
     health: u8 = 255,
     /// rest goes up and down based on time spent on job and rest
     rest: u8 = 255,
+    speed: f32 = 1,
     position: Vec2 = HIVE_ORIGIN,
     address: Address = .{},
 
@@ -295,7 +334,7 @@ pub const Bee = struct {
             .rest_slot_available => {
                 if (self.rest > 128) return false;
                 self.job = .{
-                    .role = .resting,
+                    .role = .rest,
                     .room = signal.room,
                     .waypoint = null,
                     .destination = null,
@@ -311,6 +350,7 @@ pub const Bee = struct {
 };
 
 const SignalType = enum {
+    const Self = @This();
     storage_food_available,
     storage_space_available,
     rest_slot_available,
@@ -322,6 +362,23 @@ const SignalType = enum {
     queen_egg_available,
     queen_attention_required,
     collection_bee_required,
+
+    pub fn decrementWhenRoomConsumes(self: *const Self) bool {
+        return switch (self.*) {
+            .storage_space_available => false,
+            .storage_food_available,
+            .rest_slot_available,
+            .room_maintenance_required,
+            .room_construction_required,
+            .incubator_food_required,
+            .incubator_attention_required,
+            .incubator_egg_required,
+            .queen_egg_available,
+            .queen_attention_required,
+            .collection_bee_required,
+            => true,
+        };
+    }
 };
 
 pub const Signal = struct {
@@ -334,6 +391,7 @@ pub const Signal = struct {
 
 pub const Hive = struct {
     const Self = @This();
+    rng: std.rand.Xoshiro256,
     food: usize = 0,
     ticks: u64 = 0,
     bees: std.ArrayList(Bee),
@@ -347,6 +405,7 @@ pub const Hive = struct {
 
     pub fn init(allocator: std.mem.Allocator, arena: std.mem.Allocator) Self {
         var self = Self{
+            .rng = std.rand.DefaultPrng.init(0),
             .bees = std.ArrayList(Bee).init(allocator),
             .jobs = std.ArrayList(Job).init(allocator),
             .rooms = std.ArrayList(Room).init(allocator),
@@ -366,16 +425,19 @@ pub const Hive = struct {
     }
 
     pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator) void {
+        const raw_delta_t = ticks - self.ticks;
+        const delta_t = @min(raw_delta_t, DELTA_T_CAP);
         self.ticks = ticks;
         self.arena = arena;
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_0");
         // iterate through all bees. move them if required. check if job is complete
-        for (self.bees.items) |*bee| {
+        for (self.bees.items, 0..) |*bee, b| {
             if (bee.job) |*job| {
                 if (bee.moving) |target_pos| {
                     // bee is either moving to job room or job destination
-                    const travel = target_pos.subtract(bee.position).normalize().scale(BEE_TRAVEL_SPEED);
+                    const travel = target_pos.subtract(bee.position).normalize().scale(@floatFromInt(f32, delta_t) * BEE_TRAVEL_SPEED * bee.speed);
                     bee.position = bee.position.add(travel);
-                    if (target_pos.distanceSqr(bee.position) < 100) { // rather than contains, we should check distance from center.
+                    if (target_pos.distanceSqr(bee.position) < BEE_REACH_DISTANCE_SQR) {
                         bee.job = job.nextStage(bee, ticks);
                     }
                 } else {
@@ -383,19 +445,35 @@ pub const Hive = struct {
                     if (job.jobTicksPerformed(self.ticks) > job.role.ticksLength()) {
                         // job is complete. mark bee as free
                         self.roomAt(job.room.address).?.slots_available[job.room.slot_index] = true;
-                        self.roomAt(job.room.address).?.live_signal_count -= 1;
+                        self.roomAt(job.room.address).?.slots_signals[job.room.slot_index] = false;
+                        // if the job needs to update the room do that.
+                        switch (job.role) {
+                            .collection => {
+                                self.roomAt(job.destination.?.address).?.slots_available[job.destination.?.slot_index] = false;
+                                self.roomAt(job.destination.?.address).?.slots_signals[job.destination.?.slot_index] = false;
+                            },
+                            .rest => {
+                                bee.rest = 255;
+                            },
+                            .eating => {
+                                bee.health = 255;
+                            },
+                            else => {},
+                        }
                         bee.job = null;
                         bee.waiting = true;
+                        if (false) helpers.debugPrint("bee{d} completed job", .{b});
                     }
                 }
             }
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_1");
         // iterate through all the rooms that emit signals.
         for (self.rooms.items) |*room| {
-            if (room.live_signal_count > NUM_SLOTS) continue;
             switch (room.room) {
                 .storage => {
                     for (room.slots_available, 0..) |avail, i| {
+                        if (room.slots_signals[i]) continue;
                         if (avail) {
                             const signal = Signal{
                                 .signal = .storage_space_available,
@@ -407,7 +485,7 @@ pub const Hive = struct {
                                 .destination = undefined,
                             };
                             self.signals.append(signal) catch unreachable;
-                            room.live_signal_count += 1;
+                            room.slots_signals[i] = true;
                         } else {
                             const signal = Signal{
                                 .signal = .storage_food_available,
@@ -419,12 +497,13 @@ pub const Hive = struct {
                                 .destination = undefined,
                             };
                             self.signals.append(signal) catch unreachable;
-                            room.live_signal_count += 1;
+                            room.slots_signals[i] = true;
                         }
                     }
                 },
                 .rest => {
                     for (room.slots_available, 0..) |avail, i| {
+                        if (room.slots_signals[i]) continue;
                         if (avail) {
                             const signal = Signal{
                                 .signal = .rest_slot_available,
@@ -436,44 +515,49 @@ pub const Hive = struct {
                                 .destination = undefined,
                             };
                             self.signals.append(signal) catch unreachable;
-                            room.live_signal_count += 1;
+                            room.slots_signals[i] = true;
                         }
                     }
                 },
                 else => {},
             }
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_2");
         // iterate through all the signals, and see if they can be consumed by nearby rooms
-        for (self.signals.items) |*signal| {
+        for (self.signals.items, 0..) |*signal, i| {
+            if (signal.consumed) continue;
             const center = signal.room.address;
-            for (NEIGHBOURS_1) |n| {
+            for (NEIGHBOURS) |n| {
                 const address = center.add(n);
                 if (self.roomAt(address)) |room| {
-                    if (room.live_signal_count > NUM_SLOTS) continue;
                     if (room.tryConsumeSignal(signal)) |new_signal| {
+                        if (false) helpers.debugPrint("signal{d} was consumed by room({d},{d})", .{ i, room.address.x, room.address.y });
                         signal.consumed = true;
+                        if (signal.signal.decrementWhenRoomConsumes()) self.roomAt(signal.room.address).?.slots_signals[signal.room.slot_index] = false;
                         self.signals.append(new_signal) catch unreachable;
-                        room.live_signal_count += 1;
                         break;
                     }
                 }
             }
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_3");
         // iterate through all the bees, and see if they want to consume the signals
-        for (self.bees.items) |*bee| {
+        for (self.bees.items, 0..) |*bee, b| {
             if (bee.job != null) continue;
-            for (self.signals.items) |*signal| {
+            for (self.signals.items, 0..) |*signal, i| {
+                if (signal.consumed) continue;
                 if (bee.tryConsumeSignal(signal)) {
                     // TODO (11 Jul 2023 sam): Check distance also
+                    if (false) helpers.debugPrint("signal{d} was consumed by bee{d}", .{ i, b });
                     signal.consumed = true;
                     std.debug.assert(bee.job != null);
                     break;
                 }
             }
         }
-        {
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_4");
+        if (self.signals.items.len > 0) {
             // remove consumed signals
-            // to store all the signals that are consumed.
             var i: usize = self.signals.items.len - 1;
             while (i >= 0) : (i -= 1) {
                 if (self.signals.items[i].consumed) {
@@ -482,6 +566,7 @@ pub const Hive = struct {
                 if (i == 0) break;
             }
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_5");
         // tick down health and rest every 300 ticks?
         while (self.ticks - self.prev_tick_down > BEE_TICK_RATE) {
             self.prev_tick_down += BEE_TICK_RATE;
@@ -490,6 +575,7 @@ pub const Hive = struct {
                 if (bee.rest > 0) bee.rest -= 1;
             }
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_6");
         {
             // check working bees counts
             var count: usize = 0;
@@ -499,24 +585,27 @@ pub const Hive = struct {
             if (count != self.working_bees) helpers.debugPrint("{d} working bees", .{count});
             self.working_bees = count;
         }
+        if (PRINT_F_DEBUG) c.debugPrint("hive_update_7");
     }
 
     fn setupHive(self: *Self) void {
-        for (0..100) |_| {
-            self.bees.append(.{}) catch unreachable;
+        for (0..NUM_BEES) |_| {
+            var bee = Bee{};
+            bee.speed = (1 - BEE_SPEED_VARIATION) + (self.rng.random().float(f32) * 2 * BEE_SPEED_VARIATION);
+            self.bees.append(bee) catch unreachable;
         }
         self.rooms.append(.{ .room = .queen, .address = .{} }) catch unreachable;
-        self.rooms.append(.{ .room = .rest, .address = .{ .x = -1, .y = -1 } }) catch unreachable;
-        self.rooms.append(.{ .room = .rest, .address = .{ .x = 1, .y = -1 } }) catch unreachable;
+        self.rooms.append(.{ .room = .storage, .address = .{ .x = -1, .y = -1 } }) catch unreachable;
+        self.rooms.append(.{ .room = .storage, .address = .{ .x = 1, .y = -1 } }) catch unreachable;
         self.rooms.append(.{ .room = .collection, .address = .{ .x = -1, .y = 1 } }) catch unreachable;
         self.rooms.append(.{ .room = .collection, .address = .{ .x = 1, .y = 1 } }) catch unreachable;
-        self.rooms.append(.{ .room = .storage, .address = .{ .x = 0, .y = 2 } }) catch unreachable;
-        self.rooms.append(.{ .room = .storage, .address = .{ .x = 0, .y = -2 } }) catch unreachable;
+        self.rooms.append(.{ .room = .rest, .address = .{ .x = 0, .y = 2 } }) catch unreachable;
+        self.rooms.append(.{ .room = .rest, .address = .{ .x = 0, .y = -2 } }) catch unreachable;
     }
 
     pub fn debugRooms(self: *Self) void {
         for (self.rooms.items, 0..) |room, i| {
-            helpers.debugPrint("room{d}, {s} - available_slots={d}, live_signals={d}", .{ i, @tagName(room.room), room.slotCount(), room.live_signal_count });
+            helpers.debugPrint("room{d}, {s} - available_slots={d}, live_signals={d}", .{ i, @tagName(room.room), room.slotCount(), room.liveSignalCount() });
         }
     }
 
@@ -594,6 +683,7 @@ pub const Game = struct {
                 const address = Vec2i{ .x = x, .y = y };
                 if (Cell.isValidCellAddress(address)) {
                     var cell = Cell.init(address);
+                    cell.address = address;
                     self.cells_address.put(address, self.cells.items.len) catch unreachable;
                     self.cells.append(cell) catch unreachable;
                 }
@@ -637,8 +727,18 @@ pub const Game = struct {
                 .color = colors.solarized_base03,
                 .style = FONT_1,
             });
+            if (room.room == .storage) {
+                const storage = std.fmt.allocPrintZ(self.arena, "{d}/8", .{NUM_SLOTS - room.slotCount()}) catch unreachable;
+                self.haathi.drawText(.{
+                    .text = storage,
+                    .position = Cell.addressToPos(room.address).add(.{ .y = 20 }),
+                    .color = colors.solarized_base03,
+                    .style = FONT_1,
+                });
+            }
         }
-        for (self.hive.bees.items) |bee| {
+        const y_padding: f32 = (720.0 - (BEE_STATUS_BAR_HEIGHT * NUM_BEES)) / (NUM_BEES + 1.0);
+        for (self.hive.bees.items, 0..) |bee, i| {
             self.haathi.drawRect(.{
                 .position = bee.position,
                 .size = .{ .x = 10, .y = 10 },
@@ -646,6 +746,52 @@ pub const Game = struct {
                 .radius = 10,
                 .centered = true,
             });
+            // draw the status of the bee
+            const y: f32 = (y_padding * @floatFromInt(f32, i + 1)) + (BEE_STATUS_BAR_HEIGHT * @floatFromInt(f32, i));
+            const health = @floatFromInt(f32, bee.health) / 255.0;
+            const rest = @floatFromInt(f32, bee.rest) / 255.0;
+            self.haathi.drawRect(.{
+                .position = .{ .x = BEE_HEALTH_STATUS_X, .y = y },
+                .size = .{ .x = BEE_STATUS_BAR_WIDTH, .y = BEE_STATUS_BAR_HEIGHT },
+                .color = colors.solarized_base2,
+                .centered = false,
+            });
+            self.haathi.drawRect(.{
+                .position = .{ .x = BEE_REST_STATUS_X, .y = y },
+                .size = .{ .x = BEE_STATUS_BAR_WIDTH, .y = BEE_STATUS_BAR_HEIGHT },
+                .color = colors.solarized_base2,
+                .centered = false,
+            });
+            self.haathi.drawRect(.{
+                .position = .{ .x = BEE_HEALTH_STATUS_X, .y = y },
+                .size = .{ .x = health * BEE_STATUS_BAR_WIDTH, .y = BEE_STATUS_BAR_HEIGHT },
+                .color = colors.solarized_base1,
+                .centered = false,
+            });
+            self.haathi.drawRect(.{
+                .position = .{ .x = BEE_REST_STATUS_X, .y = y },
+                .size = .{ .x = rest * BEE_STATUS_BAR_WIDTH, .y = BEE_STATUS_BAR_HEIGHT },
+                .color = colors.solarized_base1,
+                .centered = false,
+            });
+        }
+        if (false) { // draw the addresses of cells
+            var x: isize = -10;
+            while (x <= HIVE_SIZE + 1) : (x += 1) {
+                var y: isize = -10;
+                while (y <= HIVE_SIZE + 1) : (y += 1) {
+                    const address = Vec2i{ .x = x, .y = y };
+                    if (Cell.isValidCellAddress(address)) {
+                        const address_str = std.fmt.allocPrintZ(self.arena, "{d},{d}", .{ address.x, address.y }) catch unreachable;
+                        self.haathi.drawText(.{
+                            .text = address_str,
+                            .position = Cell.addressToPos(address),
+                            .color = colors.solarized_base03,
+                            .style = FONT_2,
+                        });
+                    }
+                }
+            }
         }
     }
 };
