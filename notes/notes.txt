@@ -444,3 +444,24 @@ Next is incubator.
 
 Man we really need to clean up the whole slots, signals and all. Atleast I
 think so.
+
+---
+
+13 Jul 2023:
+By the end of today, we should be able to have the whole thing be interactive,
+and then tune all the numbers.
+
+But first, I am not able to figure out why the incbator requiring food is not
+able to reduce food from the storage. Lol, that was quick fix. The main issue
+when I was investigating it yesterday was that it was reducing it at the wrong
+time, ie when the food was delivered, not when it was picked and that was
+causing the confusion. Okay, lets see whether we can fix that.
+
+Yup. That's done.
+
+Next I think that along with adding the interactivity, we should also figure
+out how to structure the beginning of the game. Ideally just start off with
+the queen, rest, and storage. Then build out the rest after that.
+
+I have a feeling there is an issue with the slots. It feels like after some
+time, there is food available, but there are still collectors going out.

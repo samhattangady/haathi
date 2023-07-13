@@ -143,14 +143,14 @@ pub const DrawRectOptions = struct {
 };
 
 pub const DrawPathOptions = struct {
-    points: []Vec2,
+    points: []const Vec2,
     color: Vec4,
     width: f32 = 5,
     closed: bool = false,
 };
 
 pub const DrawPolyOptions = struct {
-    points: []Vec2,
+    points: []const Vec2,
     color: Vec4,
 };
 

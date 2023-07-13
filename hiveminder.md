@@ -59,3 +59,18 @@ the case.  ¯\\_(ツ)_/¯
 It's not bad. I think we have most of the basic systems up and running now, which is a decent place
 to be at this point. Tomorrow, we actually add the interactions, and see what are the things that
 need to be changed and what are the interactions that make sense.
+
+---
+
+### 13 Jul 2023
+It's really coming together well. Almost all the systems are in place now. It's a little late though.
+Ideally I'd have wanted to be in this position at the end of day 3. So now I have one day for tuning
+(and theres a lot of tuning that's needed), and polish, presentation and completion.
+Would have been nice to have more time for that.
+
+Also I think because of the time constraint, while I was able to build out the systems, I wasn't
+really able to play with them. So there was no real shot at finding emergence and highlight it within
+the story/gameplay. While that is not an explicit goal of these jams, it is an overall goal. Though
+maybe it is okay to skip out on them for now.
+
+One more day of work. Let's see where we can reach =)

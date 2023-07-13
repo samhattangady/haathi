@@ -1,5 +1,7 @@
 const std = @import("std");
 const c = @import("interface.zig");
+const inputs = @import("inputs.zig");
+const MouseState = inputs.MouseState;
 
 pub const Vec2 = struct {
     const Self = @This();
@@ -106,6 +108,13 @@ pub const Vec2 = struct {
             .y = easeinoutf(v1.y, v2.y, t),
         };
     }
+
+    pub fn lerp(v0: *const Vec2, v1: Vec2, t: f32) Vec2 {
+        return .{
+            .x = lerpf(v0.x, v1.x, t),
+            .y = lerpf(v0.y, v1.y, t),
+        };
+    }
 };
 
 pub const Vec2i = struct {
@@ -209,6 +218,32 @@ pub const Rect = struct {
     }
 };
 
+pub const Button = struct {
+    const Self = @This();
+    rect: Rect,
+    value: u8,
+    text: []const u8,
+    // mouse is hovering over button
+    hovered: bool = false,
+    // the frame that mouse button was down in bounds
+    clicked: bool = false,
+    // the frame what mouse button was released in bounds (and was also down in bounds)
+    released: bool = false,
+    // when mouse was down in bounds and is still down.
+    triggered: bool = false,
+
+    pub fn contains(self: *const Self, pos: Vec2) bool {
+        return self.rect.contains(pos);
+    }
+
+    pub fn update(self: *Self, mouse: MouseState) void {
+        self.hovered = !mouse.l_button.is_down and self.contains(mouse.current_pos);
+        self.clicked = mouse.l_button.is_clicked and self.contains(mouse.current_pos);
+        self.released = mouse.l_button.is_released and self.contains(mouse.current_pos) and self.contains(mouse.l_down_pos);
+        self.triggered = mouse.l_button.is_down and self.contains(mouse.l_down_pos);
+    }
+};
+
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
     // Bezier Blend as per StackOverflow : https://stackoverflow.com/a/25730573/5453127
     // t goes between 0 and 1.
@@ -240,7 +275,7 @@ pub fn xRayIntersects(point: Vec2, v0: Vec2, v1: Vec2) bool {
     // point.x is between v0.x and v1.x
     // get the point of intersection
     const y_fract = (point.y - v0.y) / (v1.y - v0.y);
-    const x_intersect = lerp(v0.x, v1.x, y_fract);
+    const x_intersect = lerpf(v0.x, v1.x, y_fract);
     // if intersection point is more than point.x, intersection
     return x_intersect >= point.x;
 }
@@ -264,6 +299,6 @@ pub fn polygonContainsPoint(verts: []const Vec2, point: Vec2, bbox: ?Rect) bool 
 }
 
 /// t varies from 0 to 1. (Can also be outside the range for extrapolation)
-pub fn lerp(start: f32, end: f32, t: f32) f32 {
+pub fn lerpf(start: f32, end: f32, t: f32) f32 {
     return (start * (1.0 - t)) + (end * t);
 }
