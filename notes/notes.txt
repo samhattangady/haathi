@@ -465,3 +465,13 @@ the queen, rest, and storage. Then build out the rest after that.
 
 I have a feeling there is an issue with the slots. It feels like after some
 time, there is food available, but there are still collectors going out.
+
+---
+
+14 Jul 2023:
+Final day of the jam. I think things are in place, and we should be able to
+finish. First, we want to get all the stats up and visible so that it's easy
+to see the things that are there. We also want to implement death by hunger.
+So that's another thing that we can work on.
+
+Good place to start.
