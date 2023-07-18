@@ -3,12 +3,14 @@ const std = @import("std");
 pub fn build(b: *std.build.Builder) void {
     if (b.option(bool, "font_builder", "Tool to build fonts")) |_| font_builder(b);
     if (b.option(bool, "synthelligence", "Build Synthelligence Game")) |_| synth_builder(b);
-    if (b.option(bool, "hiveminder", "Build Hiveminder Game")) |_| hive_builder(b);
+    if (b.option(bool, "hiveminder", "Build Hiveminder Game")) |_| jam_game_builder(b, .hiveminder);
+    if (b.option(bool, "drifter", "Build Drifter Game")) |_| jam_game_builder(b, .drifter);
 }
 
 pub const Game = enum {
     synthelligence,
     hiveminder,
+    drifter,
 };
 
 fn font_builder(b: *std.build.Builder) void {
@@ -51,11 +53,11 @@ fn synth_builder(b: *std.build.Builder) void {
     b.installArtifact(exe);
 }
 
-fn hive_builder(b: *std.build.Builder) void {
+fn jam_game_builder(b: *std.build.Builder, game: Game) void {
     const target = std.zig.CrossTarget.parse(.{ .arch_os_abi = "wasm32-freestanding" }) catch unreachable;
     const optimize = b.standardOptimizeOption(.{});
     var options = b.addOptions();
-    options.addOption(Game, "game", .hiveminder);
+    options.addOption(Game, "game", game);
     const exe = b.addSharedLibrary(.{
         .name = "haathi",
         .root_source_file = .{ .path = "src/main.zig" },

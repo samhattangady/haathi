@@ -7,6 +7,17 @@ const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
 const Vec4 = helpers.Vec4;
 
+pub const SCREEN_HEIGHT = 720;
+pub const SCREEN_WIDTH = 1280;
+pub const SCREEN_SIZE = Vec2{ .x = SCREEN_WIDTH, .y = SCREEN_HEIGHT };
+
+pub const CursorStyle = enum {
+    auto,
+    default,
+    none,
+    pointer,
+};
+
 /// Haathi will have all the info about the inputs and things like that.
 /// It will also be the one who collates all the render calls, and then
 /// passes them on.
@@ -123,6 +134,10 @@ pub const Haathi = struct {
     }
     pub fn drawText(self: *Self, text: DrawTextOptions) void {
         self.drawables.append(.{ .text = text }) catch unreachable;
+    }
+    pub fn setCursor(self: *Self, cursor: CursorStyle) void {
+        _ = self;
+        c.setCursor(@tagName(cursor).ptr);
     }
 };
 

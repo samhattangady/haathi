@@ -16,3 +16,4 @@ pub extern fn ellipse(x: f32, y: f32, rx: f32, ry: f32, start: f32, end: f32, co
 pub extern fn font(font: [*]const u8) void;
 pub extern fn fillText(text: [*]const u8, x: f32, y: f32, width: f32) void;
 pub extern fn textAlign(alignment: [*]const u8) void;
+pub extern fn setCursor(style: [*]const u8) void;

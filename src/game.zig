@@ -2,11 +2,15 @@ const std = @import("std");
 const c = @import("interface.zig");
 const Haathi = @import("haathi.zig").Haathi;
 const colors = @import("colors.zig");
+const MouseState = @import("inputs.zig").MouseState;
+const SCREEN_SIZE = @import("haathi.zig").SCREEN_SIZE;
 
 const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
 const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
+
+const FONT_1 = "18px JetBrainsMono";
 
 pub const Game = struct {
     const Self = @This();

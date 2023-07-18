@@ -32,7 +32,9 @@ pub const Vec2 = struct {
     }
 
     pub fn normalize(v: *const Self) Self {
-        return v.scale(1 / v.length());
+        const len = v.length();
+        if (len == 0) return v.scale(0);
+        return v.scale(1 / len);
     }
 
     pub fn xVec(v: *const Self) Self {
@@ -81,12 +83,6 @@ pub const Vec2 = struct {
         };
     }
 
-    pub fn alignTo(v: *const Self, src: Self, target: Self) Self {
-        _ = v;
-        var vec = target.add(src.scale(-1)).normalize();
-        return vec;
-    }
-
     pub fn round(v: *const Self) Vec2i {
         return .{
             .x = @intFromFloat(i32, @round(v.x)),
@@ -98,6 +94,11 @@ pub const Vec2 = struct {
         return (v1.x * v2.x) + (v1.y * v2.y);
     }
 
+    /// to get the sin of the angle between the two vectors.
+    pub fn crossZ(v1: *const Self, v2: Self) f32 {
+        return (v1.x * v2.y) - (v1.y * v2.x);
+    }
+
     pub fn perpendicular(v: *const Self) Self {
         return .{ .x = v.y, .y = -v.x };
     }
@@ -106,6 +107,22 @@ pub const Vec2 = struct {
         return .{
             .x = easeinoutf(v1.x, v2.x, t),
             .y = easeinoutf(v1.y, v2.y, t),
+        };
+    }
+
+    /// takes a Vec2 v that is currently aligned to origin. It then rotates it
+    /// such that it now has the same relationship with target as it originally
+    /// had with origin.
+    /// origin and target need to be normalized.
+    /// For example, if we have offsets of a polygon, and we want to rotate it,
+    /// then the origin will be x axis, and the target will be the rotation.
+    pub fn alignTo(v: *const Self, origin: Vec2, target: Vec2) Vec2 {
+        // get the angle between origin and target
+        const cosa = origin.dot(target);
+        const sina = origin.crossZ(target);
+        return .{
+            .x = (cosa * v.x) - (sina * v.y),
+            .y = (sina * v.x) + (cosa * v.y),
         };
     }
 
@@ -211,10 +228,18 @@ pub const Rect = struct {
     size: Vec2,
 
     pub fn contains(self: *const Self, pos: Vec2) bool {
-        return (pos.x > self.position.x) and
-            (pos.x < self.position.x + self.size.x) and
-            (pos.y > self.position.y) and
-            (pos.y < self.position.y + self.size.y);
+        const minx = @min(self.position.x, self.position.x + self.size.x);
+        const maxx = @max(self.position.x, self.position.x + self.size.x);
+        const miny = @min(self.position.y, self.position.y + self.size.y);
+        const maxy = @max(self.position.y, self.position.y + self.size.y);
+        return (pos.x > minx) and
+            (pos.x < maxx) and
+            (pos.y > miny) and
+            (pos.y < maxy);
+    }
+
+    pub fn center(self: *const Self) Vec2 {
+        return self.position.add(self.size.scale(0.5));
     }
 };
 

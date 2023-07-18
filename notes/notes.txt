@@ -475,3 +475,56 @@ to see the things that are there. We also want to implement death by hunger.
 So that's another thing that we can work on.
 
 Good place to start.
+
+---
+
+17 Jul 2023:
+New week. New jam. I want to do a thinky racing / drifting game this time. So
+the first question is how do we even go about that?
+One idea that I had is that you control the car through graphs. So you have
+bezier curves and you adjust the steering and acceleration/braking over time,
+and that allows you to control the car as well.
+
+I t hink that is an interesting idea. But we cant know if it workds until we
+build the damn thing.
+
+The real question is how to tune it. Should we start off with a keyboard
+controlled car, and then get the controls etc worked out and then transfer
+that over to a graph based controller? Or is it better for us to start off
+with the graph based controls itself?
+
+That's honestly quite a hard question. I think we should spend some time on
+the keyboard based controls, just to see what all is required to make. After
+that we can go to drift based, and then tune the game based on that. Okay. Let
+us begin.
+
+I'm just thinking a bit about it. I don't know all that much about drifting,
+but the again, so does nobody else. So having the drift resemble what arcade
+games have makes sense to me. It's not quite neccessary to have things like
+counter steer and things like that in my opinion. Just keep it simple, and
+let's see how it turns out. I'm also concerned in general whether it will be
+interesting or thinky once it's all in place. But honestly the only way to
+know that is to actually sit and do it. So stop procrastinating now.
+
+---
+
+18 Jul 2023:
+The drifting stuff really didn't plan out. I think, instead, I am going to
+make something traffic related. I have an idea where you have these signals,
+with cars waiting at them, and then you connect the different signals to each
+other without things crashing. Something like that.
+
+So again, we come to that same question. What is the minimum vialble product
+version of this prototype? What we need are cars, signals and connections. So
+at each "step", an action gets queued. Cool.
+The connections can either be at the exit of the lane, or the entrance of the
+lane. ie, when the car enters the intersection or when it leaves it.
+
+But once again, mvp. start off with two lanes, two cars, and one connection,
+that triggers on car exit.
+
+Good day good day. I think we have an idea that could work. We have the
+systems set up. Tomorrow we start off with adding the player interactions and
+level editor and stuffs. It shouldn't take too long. And then we have
+potentially 2 and a half days to just explore what the system has to offer.
+Nice.
