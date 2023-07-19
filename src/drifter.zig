@@ -214,20 +214,48 @@ const Connection = struct {
 
 const Path = struct {
     const Self = @This();
-    start: Vec2,
-    midpoint: Vec2,
-    endpoint: Vec2,
+    points: [32]Vec2 = undefined,
+
+    pub fn initIntersection(source_lane_index: u8, destination_lane_index: u8, intersection: *const Intersection) Self {
+        var self: Self = undefined;
+        const car = Car{ .source_lane_index = source_lane_index, .destination_lane_index = destination_lane_index, .position_in_lane = 0 };
+        const start = intersection.getCarPosition(&car);
+        const start_curve = intersection.lanes.items[source_lane_index].head;
+        const end_curve = intersection.lanes.items[destination_lane_index].head;
+        const end = intersection.lanes.items[destination_lane_index].head.add(intersection.lanes.items[destination_lane_index].toward.scale(-SCREEN_SIZE.y * 1.2));
+        self.points[0] = start;
+        self.points[31] = end;
+        for (1..31) |i| {
+            const fract = @floatFromInt(f32, i - 1) / 29;
+            self.points[i] = start_curve.lerp(end_curve, fract);
+        }
+        return self;
+    }
+
+    pub fn initEndpoints(p0: Vec2, p1: Vec2) Self {
+        var self: Self = undefined;
+        for (0..32) |i| {
+            const fract = @floatFromInt(f32, i) / 31;
+            self.points[i] = p0.lerp(p1, fract);
+        }
+        return self;
+    }
 
     pub fn progress(self: *const Self, amount: f32) Vec2 {
-        if (amount < 0.5) {
-            const val = amount * 2;
-            return self.start.lerp(self.midpoint, val);
-        } else if (amount < 1) {
-            const val = (amount - 0.5) * 2;
-            return self.midpoint.lerp(self.endpoint, val);
-        } else {
-            return self.endpoint;
+        // TODO (19 Jul 2023 sam): Make smooth
+        const raw_index = @intFromFloat(usize, amount * 31);
+        const index = @min(31, raw_index);
+        return self.points[index];
+    }
+
+    pub fn intersects(self: *const Self, other: Self) bool {
+        if (self.points[31].distanceSqr(other.points[31]) < 10) return true;
+        if (helpers.lineSegmentsIntersect(self.points[1], self.points[31], other.points[1], other.points[31])) |_| {
+            return true;
         }
+        // TODO (19 Jul 2023 sam): U turn check. If 0 is doing u turn, and 6 is going straight
+        // they should crash, which this current check doesn't handle.
+        return false;
     }
 };
 
@@ -428,15 +456,26 @@ const Intersection = struct {
         return lane.head.add(offset);
     }
 
-    /// for now there is a collision if 2 cars move together. Later on, we can
-    /// adjust this.
+    /// Check all the paths. If there is an intersection, then there is a collision
+    /// also collision if multiple cars are going to same endpoint
     fn checkForCollision(self: *Self) void {
-        var count: usize = 0;
+        var paths = std.ArrayList(Path).init(self.arena);
         for (self.cars.items) |*car| {
             if (car.done) continue;
-            if (car.moved) count += 1;
+            if (car.target_position) |tpos| paths.append(tpos) catch unreachable;
         }
-        if (count > 1) {
+        var crashed = false;
+        collision_check: {
+            for (paths.items, 0..) |path, i| {
+                for (paths.items[i + 1 ..]) |path2| {
+                    if (path.intersects(path2)) {
+                        crashed = true;
+                        break :collision_check;
+                    }
+                }
+            }
+        }
+        if (crashed) {
             self.crashed = true;
             for (self.cars.items) |*car| {
                 if (car.done) continue;
@@ -471,12 +510,7 @@ const Intersection = struct {
         if (car.moved) return;
         car.moved = true;
         car.progress = 0;
-        const target_lane = self.lanes.items[car.destination_lane_index];
-        car.target_position = .{
-            .start = car.position,
-            .midpoint = INTERSECTION_MIDPOINT,
-            .endpoint = INTERSECTION_MIDPOINT.add(target_lane.toward.scale(-500)),
-        };
+        car.target_position = Path.initIntersection(car.source_lane_index, car.destination_lane_index, self);
         if (self.sensorAt(car.source_lane_index)) |sensor| {
             var conn_memory: [2]Connection = undefined;
             for (self.connectionsAt(sensor.lane_index, &conn_memory)) |conn| {
@@ -494,11 +528,7 @@ const Intersection = struct {
             if (other_car.source_lane_index == car.source_lane_index) {
                 other_car.position_in_lane -= 1;
                 other_car.progress = 0;
-                other_car.target_position = .{
-                    .start = other_car.position,
-                    .midpoint = self.getCarPosition(other_car),
-                    .endpoint = self.getCarPosition(other_car),
-                };
+                other_car.target_position = Path.initEndpoints(other_car.position, self.getCarPosition(other_car));
             }
         }
     }

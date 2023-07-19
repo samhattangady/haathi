@@ -346,3 +346,32 @@ pub fn applyChangeLooped(value: u8, change: i8, max: u8) u8 {
 // pub fn enumCycleLooped(val: anytype, change: i8) @TypeOf(val) {
 //
 // }
+
+pub fn lineSegmentsIntersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) ?Vec2 {
+    // sometimes it looks like single points are being passed in
+    if (p1.equal(p2) and p2.equal(p3) and p3.equal(p4)) {
+        return p1;
+    }
+    if (p1.equal(p2) or p3.equal(p4)) {
+        return null;
+    }
+    const t = ((p1.x - p3.x) * (p3.y - p4.y)) - ((p1.y - p3.y) * (p3.x - p4.x));
+    const u = ((p2.x - p1.x) * (p1.y - p3.y)) - ((p2.y - p1.y) * (p1.x - p3.x));
+    const d = ((p1.x - p2.x) * (p3.y - p4.y)) - ((p1.y - p2.y) * (p3.x - p4.x));
+    // TODO (24 Apr 2021 sam): There is an performance improvement here where the division is not
+    // necessary. Be careful of the negative signs when figuring that all out.  @@Performance
+    const td = t / d;
+    const ud = u / d;
+    if (td >= 0.0 and td <= 1.0 and ud >= 0.0 and ud <= 1.0) {
+        var s = t / d;
+        if (d == 0) {
+            s = 0;
+        }
+        return Vec2{
+            .x = p1.x + s * (p2.x - p1.x),
+            .y = p1.y + s * (p2.y - p1.y),
+        };
+    } else {
+        return null;
+    }
+}

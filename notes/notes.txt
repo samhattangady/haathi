@@ -544,3 +544,8 @@ So what all does dev mode need?
 - add / remove cars in lane
 - change the destination of the cars
 - set the initial signal states.
+
+Nice. Lot of stuff done. Added all the controls, level editor, level save and
+load (rudimentary + manual), better collision checks.
+For tomorrow, do the uturn collision check. Smooth out paths. Then just level
+design things baby.
