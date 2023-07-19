@@ -528,3 +528,14 @@ systems set up. Tomorrow we start off with adding the player interactions and
 level editor and stuffs. It shouldn't take too long. And then we have
 potentially 2 and a half days to just explore what the system has to offer.
 Nice.
+
+---
+
+19 Jul 2023:
+So okay, it's a new day. So we need to start off working. I think we have the
+tasks for today morning already planned out last night. First, we add the
+player interactions, ie, connecting sensors to signals. Then we add some kind
+of level editor (and that should include saving and loading however
+rudimentart, even something like saving levels in text...)
+
+Also we need to rename triggers to sensors. Let's do that first =D

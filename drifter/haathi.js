@@ -157,7 +157,7 @@ const fillText = (text, x, y, width) => {
 }
 
 const setCursor = (style) => {
-  document.body.style.cursor = wasmString(style);
+  document.body.style.cursor = wasmString(style).replace("_", "-");
 }
 
 var api = {
