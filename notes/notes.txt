@@ -539,3 +539,8 @@ of level editor (and that should include saving and loading however
 rudimentart, even something like saving levels in text...)
 
 Also we need to rename triggers to sensors. Let's do that first =D
+
+So what all does dev mode need?
+- add / remove cars in lane
+- change the destination of the cars
+- set the initial signal states.

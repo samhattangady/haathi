@@ -327,3 +327,22 @@ pub fn polygonContainsPoint(verts: []const Vec2, point: Vec2, bbox: ?Rect) bool 
 pub fn lerpf(start: f32, end: f32, t: f32) f32 {
     return (start * (1.0 - t)) + (end * t);
 }
+
+/// When we have an index that we want to toggle through while looping, then we use this.
+pub fn applyChangeLooped(value: u8, change: i8, max: u8) u8 {
+    std.debug.assert(change == 1 or change == -1);
+    if (change == 1) {
+        if (value == max) return 0;
+        return value + 1;
+    }
+    if (change == -1) {
+        if (value == 0) return max;
+        return value - 1;
+    }
+    unreachable;
+}
+
+// /// given an enum, it gives the next value in the cycle, and loops if required
+// pub fn enumCycleLooped(val: anytype, change: i8) @TypeOf(val) {
+//
+// }

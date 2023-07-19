@@ -14,7 +14,10 @@ const Rect = helpers.Rect;
 const FONT_1 = "18px JetBrainsMono";
 const INTERSECTION_MIDPOINT = Vec2{ .x = (SCREEN_SIZE.y * 0.5), .y = SCREEN_SIZE.y * 0.5 };
 
+const test_1 = "car|0|1 car|4|5 car|0|5 car|4|3 car|4|5 car|2|3 car|6|7 car|6|3 car|6|3 sig|0|green sig|2|red sig|4|red sig|6|red";
+
 const CAR_SPACING = 50;
+const CAR_SIZE = Vec2{ .x = 30, .y = 40 };
 const LaneType = enum {
     incoming,
     outgoing,
@@ -180,6 +183,21 @@ const Signal = struct {
             .set_green => self.signal = .green,
         }
     }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.lane_index = std.fmt.parseInt(u8, tok, 10) catch unreachable;
+            if (count == 3) self.signal = std.meta.stringToEnum(SignalState, tok).?;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        return std.fmt.allocPrintZ(arena, "sig|{d}|{s}", .{ self.lane_index, @tagName(self.signal) }) catch unreachable;
+    }
 };
 
 const ConnectionEffect = enum {
@@ -217,7 +235,7 @@ const Car = struct {
     const Self = @This();
     source_lane_index: u8,
     destination_lane_index: u8,
-    position_in_lane: u8,
+    position_in_lane: u8 = undefined,
     position: Vec2 = undefined,
     target_position: ?Path = null,
     moved: bool = false,
@@ -240,6 +258,21 @@ const Car = struct {
         self.progress += 0.005;
         if (self.target_position) |tpos| self.position = tpos.progress(self.progress);
         if (self.moved and self.progress >= 1) self.done = true;
+    }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.source_lane_index = std.fmt.parseInt(u8, tok, 10) catch unreachable;
+            if (count == 3) self.destination_lane_index = std.fmt.parseInt(u8, tok, 10) catch unreachable;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        return std.fmt.allocPrintZ(arena, "car|{d}|{d}", .{ self.source_lane_index, self.destination_lane_index }) catch unreachable;
     }
 };
 
@@ -298,17 +331,14 @@ const Intersection = struct {
         self.cars.append(.{
             .source_lane_index = 0,
             .destination_lane_index = 1,
-            .position_in_lane = 0,
         }) catch unreachable;
         self.cars.append(.{
             .source_lane_index = 4,
             .destination_lane_index = 5,
-            .position_in_lane = 0,
         }) catch unreachable;
         self.cars.append(.{
             .source_lane_index = 0,
             .destination_lane_index = 5,
-            .position_in_lane = 1,
         }) catch unreachable;
         for (self.cars.items) |*car| car.setup(self);
         for (self.lanes.items, 0..) |_, i| {
@@ -316,6 +346,17 @@ const Intersection = struct {
             sensor.setup(self);
             self.sensors.append(sensor) catch unreachable;
         }
+        {
+            var car: Car = undefined;
+            car.deserialize("car|1|3");
+            helpers.debugPrint("{s}", .{car.serialize(self.arena)});
+        }
+        {
+            var sig: Signal = undefined;
+            sig.deserialize("sig|0|green");
+            helpers.debugPrint("{s}", .{sig.serialize(self.arena)});
+        }
+        self.resetLevel();
         // // connections
         // self.connections.append(.{
         //     .effect = .set_green,
@@ -506,6 +547,21 @@ const Intersection = struct {
         }) catch unreachable;
     }
 
+    fn addCar(self: *Self, src_lane_index: u8, dst_lane_index: u8) void {
+        self.cars.append(.{ .source_lane_index = src_lane_index, .destination_lane_index = dst_lane_index }) catch unreachable;
+        self.resetCars();
+    }
+
+    fn removeCar(self: *Self, lane_index: u8) void {
+        for (self.cars.items, 0..) |car, i| {
+            if (car.source_lane_index == lane_index) {
+                _ = self.cars.orderedRemove(i);
+                break;
+            }
+        }
+        self.resetCars();
+    }
+
     fn resetLevel(self: *Self) void {
         self.resetCars();
         self.resetSignals();
@@ -527,6 +583,44 @@ const Intersection = struct {
             lane_positions.items[car.source_lane_index] += 1;
             car.reset(self);
         }
+    }
+
+    fn deserialize(self: *Self, str: []const u8) void {
+        self.cars.clearRetainingCapacity();
+        self.signals.clearRetainingCapacity();
+        var tokens = std.mem.split(u8, str, " ");
+        while (tokens.next()) |token| {
+            if (std.mem.eql(u8, token[0..3], "car")) {
+                var car: Car = undefined;
+                car.deserialize(token);
+                car.setup(self);
+                self.cars.append(car) catch unreachable;
+            }
+            if (std.mem.eql(u8, token[0..3], "sig")) {
+                var sig: Signal = undefined;
+                sig.deserialize(token);
+                sig.setup(self);
+                self.signals.append(sig) catch unreachable;
+            }
+        }
+        self.setSignalStates();
+        self.resetLevel();
+    }
+
+    fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        var str = std.ArrayList(u8).init(arena);
+        for (self.cars.items) |car| {
+            var tok = car.serialize(arena);
+            str.appendSlice(tok) catch unreachable;
+            str.append(' ') catch unreachable;
+        }
+        for (self.signals.items) |sig| {
+            var tok = sig.serialize(arena);
+            str.appendSlice(tok) catch unreachable;
+            str.append(' ') catch unreachable;
+        }
+        const serialized = std.mem.trimRight(u8, str.items, " ");
+        return serialized;
     }
 };
 
@@ -600,12 +694,53 @@ pub const Game = struct {
         if (self.haathi.inputs.getKey(.space).is_clicked) self.intersection.step();
         if (self.haathi.inputs.getKey(.r).is_clicked) self.intersection.resetLevel();
         if (self.haathi.inputs.getKey(.num_1).is_clicked) self.dev_mode = !self.dev_mode;
+        if (self.dev_mode and self.haathi.inputs.getKey(.s).is_clicked) helpers.debugPrint("{s}", .{self.intersection.serialize(self.arena)});
+        if (self.dev_mode and self.haathi.inputs.getKey(.t).is_clicked) self.intersection.deserialize(test_1);
         self.intersection.update(ticks, self.arena);
         self.updateMouse();
     }
 
     fn updateMouse(self: *Self) void {
         const mouse_pos = self.haathi.inputs.mouse.current_pos;
+        if (self.dev_mode) {
+            if (self.haathi.inputs.mouse.l_button.is_clicked) {
+                // if clicked on lane, add car to lane.
+                for (self.intersection.lanes.items, 0..) |lane, i| {
+                    if (lane.lane == .outgoing) continue;
+                    if (lane.rect.contains(mouse_pos)) {
+                        self.intersection.addCar(@intCast(u8, i), @intCast(u8, i + 1));
+                    }
+                }
+                // if clicked on signal, toggle signal.
+                for (self.intersection.signals.items) |*signal| {
+                    if (signal.rect.contains(mouse_pos)) {
+                        signal.setEffect(.toggle);
+                        self.intersection.setSignalStates();
+                    }
+                }
+            }
+            if (self.haathi.inputs.mouse.r_button.is_clicked) {
+                // if clicked on lane, remove 1 car from lane.
+                for (self.intersection.lanes.items, 0..) |lane, i| {
+                    if (lane.lane == .outgoing) continue;
+                    if (lane.rect.contains(mouse_pos)) {
+                        self.intersection.removeCar(@intCast(u8, i));
+                    }
+                }
+            }
+            if (self.haathi.inputs.mouse.wheel_y != 0) {
+                const destination_lanes = [_]u8{ 1, 5, 3, 7 };
+                for (self.intersection.cars.items) |*car| {
+                    if (car.position.distanceSqr(mouse_pos) < std.math.pow(f32, CAR_SIZE.x, 2)) {
+                        const current = std.mem.indexOfScalar(u8, destination_lanes[0..], car.destination_lane_index).?;
+                        const next_index = helpers.applyChangeLooped(@intCast(u8, current), @intCast(i8, std.math.sign(self.haathi.inputs.mouse.wheel_y)), destination_lanes.len - 1);
+                        car.destination_lane_index = destination_lanes[next_index];
+                        break;
+                    }
+                }
+            }
+            return;
+        }
         switch (self.state) {
             .idle => |_| {
                 self.state.idle.hovered_sensor = null;
@@ -733,7 +868,7 @@ pub const Game = struct {
         for (self.intersection.cars.items) |car| {
             self.haathi.drawRect(.{
                 .position = car.position,
-                .size = .{ .x = 30, .y = 30 },
+                .size = CAR_SIZE,
                 .radius = 8,
                 .color = colors.solarized_base01,
                 .centered = true,

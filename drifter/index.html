@@ -30,6 +30,7 @@
       document.addEventListener('mousedown', e => instance.exports.mouseDown(e.button));
       document.addEventListener('mouseup', e => instance.exports.mouseUp(e.button));
       document.addEventListener('mousemove', e => instance.exports.mouseMove(e.x, e.y));
+      document.addEventListener('wheel', e => instance.exports.mouseWheelY(e.deltaY));
 
       function render() {
         instance.exports.render();

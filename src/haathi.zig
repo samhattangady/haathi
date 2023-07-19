@@ -98,6 +98,9 @@ pub const Haathi = struct {
     pub fn mouseMove(self: *Self, x: c_int, y: c_int) void {
         self.inputs.handleMouseMove(x, y);
     }
+    pub fn mouseWheelY(self: *Self, y: c_int) void {
+        self.inputs.handleMouseWheel(y);
+    }
 
     pub fn update(self: *Self, ticks: u64) void {
         self.ticks = ticks;

@@ -131,6 +131,9 @@ pub const Inputs = struct {
     pub fn handleMouseUp(self: *Self, code: i32, ticks: u64) void {
         self.mouse.handleMouseUp(code, ticks);
     }
+    pub fn handleMouseWheel(self: *Self, y: i32) void {
+        self.mouse.handleMouseWheel(y);
+    }
 };
 
 pub const SingleInput = struct {
@@ -216,6 +219,10 @@ pub const MouseState = struct {
         };
         button.setRelease();
         _ = ticks;
+    }
+
+    pub fn handleMouseWheel(self: *Self, y: i32) void {
+        self.wheel_y += std.math.sign(y);
     }
 
     pub fn handleMouseMove(self: *Self, x: i32, y: i32) void {
