@@ -375,3 +375,9 @@ pub fn lineSegmentsIntersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) ?Vec2 {
         return null;
     }
 }
+
+pub fn parseBool(token: []const u8) !bool {
+    if (std.mem.eql(u8, token, "true")) return true;
+    if (std.mem.eql(u8, token, "false")) return false;
+    return error.ParseError;
+}

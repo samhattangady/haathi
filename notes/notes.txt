@@ -549,3 +549,11 @@ Nice. Lot of stuff done. Added all the controls, level editor, level save and
 load (rudimentary + manual), better collision checks.
 For tomorrow, do the uturn collision check. Smooth out paths. Then just level
 design things baby.
+
+---
+
+20 Jul 2023:
+I am not sure whether it is better to do the hard stuff first or in a bit.
+Right now, I think I want to ease into the day, so lets just knock out
+something quick and easy, and then get into the harder stuff. So I think we
+can start off with smooth progress along the path.

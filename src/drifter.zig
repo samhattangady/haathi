@@ -13,8 +13,17 @@ const Rect = helpers.Rect;
 
 const FONT_1 = "18px JetBrainsMono";
 const INTERSECTION_MIDPOINT = Vec2{ .x = (SCREEN_SIZE.y * 0.5), .y = SCREEN_SIZE.y * 0.5 };
+const MID_POINT_INDEX = 16;
 
-const test_1 = "car|0|1 car|4|5 car|0|5 car|4|3 car|4|5 car|2|3 car|6|7 car|6|3 car|6|3 sig|0|green sig|2|red sig|4|red sig|6|red";
+const test_2 = "car|0|1 car|0|5 car|4|5 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|true sen|6|2|true sen|7|2|true";
+const test_1 = "car|0|1 car|4|7 sig|0|green|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|1|false";
+
+const LEVELS = [_][]const u8{
+    "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false",
+};
+
+const PANE_X = SCREEN_SIZE.y;
+const PANE_WIDTH = SCREEN_SIZE.x - SCREEN_SIZE.y;
 
 const CAR_SPACING = 50;
 const CAR_SIZE = Vec2{ .x = 30, .y = 40 };
@@ -24,10 +33,20 @@ const LaneType = enum {
 };
 
 const Direction = enum {
+    const Self = @This();
     leftward,
     rightward,
     downward,
     upward,
+
+    pub fn isOpposite(self: *const Self, other: Self) bool {
+        return switch (self.*) {
+            .leftward => other == .rightward,
+            .rightward => other == .leftward,
+            .downward => other == .upward,
+            .upward => other == .downward,
+        };
+    }
 };
 
 const ARROW = [_]Vec2{
@@ -110,6 +129,7 @@ const LaneSensor = struct {
     lane_index: u8,
     rect: Rect = undefined,
     num_slots: u8 = 2,
+    disabled: bool = false,
     slots_memory: [4]Rect = undefined,
 
     pub fn setup(self: *Self, intersection: *const Intersection) void {
@@ -121,11 +141,27 @@ const LaneSensor = struct {
         const v1 = v0.add(lane.perp.scale(50));
         self.slots_memory[0] = .{ .position = v0, .size = lane.perp.scale(20).add(lane.toward.scale(20)) };
         self.slots_memory[1] = .{ .position = v1, .size = lane.perp.scale(-20).add(lane.toward.scale(20)) };
-        std.debug.assert(self.num_slots == 2); // have to make this dynamic if we have 3 or 4
+        std.debug.assert(self.num_slots <= 2); // have to make this dynamic if we have 3 or 4
     }
 
     pub fn slots(self: *const Self) []const Rect {
         return self.slots_memory[0..self.num_slots];
+    }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.lane_index = std.fmt.parseInt(u8, tok, 10) catch unreachable;
+            if (count == 3) self.num_slots = std.fmt.parseInt(u8, tok, 10) catch unreachable;
+            if (count == 4) self.disabled = helpers.parseBool(tok) catch unreachable;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        return std.fmt.allocPrintZ(arena, "sen|{d}|{d}|{}", .{ self.lane_index, self.num_slots, self.disabled }) catch unreachable;
     }
 };
 
@@ -142,6 +178,7 @@ const Signal = struct {
     rect: Rect = undefined,
     positions: [NUM_SIGNAL_STATES]Vec2 = [_]Vec2{.{}} ** NUM_SIGNAL_STATES,
     slots: [3]Rect = undefined,
+    disabled: bool = false,
 
     pub fn setup(self: *Self, intersection: *const Intersection) void {
         const lane = intersection.lanes.items[self.lane_index];
@@ -192,11 +229,12 @@ const Signal = struct {
             if (count == 1) continue;
             if (count == 2) self.lane_index = std.fmt.parseInt(u8, tok, 10) catch unreachable;
             if (count == 3) self.signal = std.meta.stringToEnum(SignalState, tok).?;
+            if (count == 4) self.disabled = helpers.parseBool(tok) catch unreachable;
         }
     }
 
     pub fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
-        return std.fmt.allocPrintZ(arena, "sig|{d}|{s}", .{ self.lane_index, @tagName(self.signal) }) catch unreachable;
+        return std.fmt.allocPrintZ(arena, "sig|{d}|{s}|{}", .{ self.lane_index, @tagName(self.signal), self.disabled }) catch unreachable;
     }
 };
 
@@ -214,48 +252,93 @@ const Connection = struct {
 
 const Path = struct {
     const Self = @This();
-    points: [32]Vec2 = undefined,
+    points: [33]Vec2 = undefined,
+    cumulative_distance: [33]f32 = undefined,
 
     pub fn initIntersection(source_lane_index: u8, destination_lane_index: u8, intersection: *const Intersection) Self {
         var self: Self = undefined;
         const car = Car{ .source_lane_index = source_lane_index, .destination_lane_index = destination_lane_index, .position_in_lane = 0 };
         const start = intersection.getCarPosition(&car);
-        const start_curve = intersection.lanes.items[source_lane_index].head;
-        const end_curve = intersection.lanes.items[destination_lane_index].head;
-        const end = intersection.lanes.items[destination_lane_index].head.add(intersection.lanes.items[destination_lane_index].toward.scale(-SCREEN_SIZE.y * 1.2));
+        const start_lane = intersection.lanes.items[source_lane_index];
+        const end_lane = intersection.lanes.items[destination_lane_index];
+        const start_curve = start_lane.head;
+        const end_curve = end_lane.head;
+        const mid_point = if (start_lane.direction.isOpposite(end_lane.direction)) INTERSECTION_MIDPOINT.add(end_lane.toward.scale(-20)) else start_curve.lerp(end_curve, 0.5);
+        const end = end_lane.head.add(end_lane.toward.scale(-SCREEN_SIZE.y * 0.6));
         self.points[0] = start;
-        self.points[31] = end;
-        for (1..31) |i| {
-            const fract = @floatFromInt(f32, i - 1) / 29;
-            self.points[i] = start_curve.lerp(end_curve, fract);
+        self.points[self.points.len - 1] = end;
+        for (1..MID_POINT_INDEX) |i| {
+            const fract = @floatFromInt(f32, i - 1) / (MID_POINT_INDEX - 1 - 1);
+            self.points[i] = start_curve.lerp(mid_point, fract);
         }
+        self.points[MID_POINT_INDEX] = mid_point;
+        for (MID_POINT_INDEX + 1..self.points.len - 1) |i| {
+            const fract = @floatFromInt(f32, i - MID_POINT_INDEX + 1) / (self.points.len - 2);
+            self.points[i] = mid_point.lerp(end_curve, fract);
+        }
+        self.initDistances();
         return self;
     }
 
     pub fn initEndpoints(p0: Vec2, p1: Vec2) Self {
         var self: Self = undefined;
-        for (0..32) |i| {
-            const fract = @floatFromInt(f32, i) / 31;
+        for (0..33) |i| {
+            const fract = @floatFromInt(f32, i) / self.points.len - 1;
             self.points[i] = p0.lerp(p1, fract);
         }
+        self.initDistances();
         return self;
     }
 
-    pub fn progress(self: *const Self, amount: f32) Vec2 {
-        // TODO (19 Jul 2023 sam): Make smooth
-        const raw_index = @intFromFloat(usize, amount * 31);
-        const index = @min(31, raw_index);
-        return self.points[index];
+    fn initDistances(self: *Self) void {
+        var dist: f32 = 0;
+        self.cumulative_distance[0] = 0;
+        for (self.points, 0..) |p0, i| {
+            if (i == 0) continue;
+            const p1 = self.points[i - 1];
+            const d = p0.distance(p1);
+            dist += d;
+            self.cumulative_distance[i] = dist;
+        }
     }
 
-    pub fn intersects(self: *const Self, other: Self) bool {
-        if (self.points[31].distanceSqr(other.points[31]) < 10) return true;
-        if (helpers.lineSegmentsIntersect(self.points[1], self.points[31], other.points[1], other.points[31])) |_| {
-            return true;
+    pub fn progress(self: *const Self, amount: f32) Vec2 {
+        if (amount >= 1) return self.points[self.points.len - 1];
+        if (amount == 0) return self.points[0];
+        const dist = amount * self.cumulative_distance[self.points.len - 1];
+        for (self.points, self.cumulative_distance, 0..) |p1, d, i| {
+            if (i == 0) continue;
+            const prev_dist = self.cumulative_distance[i - 1];
+            const next_dist = d;
+            if (dist >= prev_dist and dist <= next_dist) {
+                const p0 = self.points[i - 1];
+                const fract = (dist - prev_dist) / (next_dist - prev_dist);
+                return p0.lerp(p1, fract);
+            }
+        }
+        return self.points[self.points.len - 1];
+    }
+
+    pub fn intersects(self: *const Self, other: Self) ?Vec2 {
+        if (self.points[self.points.len - 2].distanceSqr(other.points[self.points.len - 2]) < 10) return self.points[self.points.len - 2];
+        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[1], other.points[self.points.len - 2])) |point| {
+            return point;
+        }
+        if (helpers.lineSegmentsIntersect(self.points[1], self.points[MID_POINT_INDEX], other.points[1], other.points[self.points.len - 2])) |point| {
+            return point;
+        }
+        if (helpers.lineSegmentsIntersect(self.points[MID_POINT_INDEX], self.points[self.points.len - 2], other.points[1], other.points[self.points.len - 2])) |point| {
+            return point;
+        }
+        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[1], other.points[MID_POINT_INDEX])) |point| {
+            return point;
+        }
+        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[MID_POINT_INDEX], other.points[self.points.len - 2])) |point| {
+            return point;
         }
         // TODO (19 Jul 2023 sam): U turn check. If 0 is doing u turn, and 6 is going straight
         // they should crash, which this current check doesn't handle.
-        return false;
+        return null;
     }
 };
 
@@ -283,8 +366,10 @@ const Car = struct {
     }
 
     pub fn update(self: *Self) void {
-        self.progress += 0.005;
-        if (self.target_position) |tpos| self.position = tpos.progress(self.progress);
+        self.progress += 0.01;
+        if (self.target_position) |tpos| {
+            self.position = tpos.progress(self.progress);
+        }
         if (self.moved and self.progress >= 1) self.done = true;
     }
 
@@ -314,7 +399,7 @@ const Intersection = struct {
     signal_states: std.ArrayList(SignalState),
     ticks: u64 = 0,
     steps: u8 = 0,
-    crashed: bool = false,
+    crash_point: ?Vec2 = null,
     show_crash: bool = false,
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
@@ -336,61 +421,16 @@ const Intersection = struct {
 
     fn setup(self: *Self) void {
         self.setupLanes();
-        // signals
-        self.signals.append(.{
-            .signal = .green,
-            .lane_index = 0,
-        }) catch unreachable;
-        self.signals.append(.{
-            .signal = .red,
-            .lane_index = 2,
-        }) catch unreachable;
-        self.signals.append(.{
-            .signal = .red,
-            .lane_index = 4,
-        }) catch unreachable;
-        self.signals.append(.{
-            .signal = .red,
-            .lane_index = 6,
-        }) catch unreachable;
-        for (self.signals.items) |*signal| signal.setup(self);
-        self.setSignalStates();
-        // cars
-        self.cars.append(.{
-            .source_lane_index = 0,
-            .destination_lane_index = 1,
-        }) catch unreachable;
-        self.cars.append(.{
-            .source_lane_index = 4,
-            .destination_lane_index = 5,
-        }) catch unreachable;
-        self.cars.append(.{
-            .source_lane_index = 0,
-            .destination_lane_index = 5,
-        }) catch unreachable;
-        for (self.cars.items) |*car| car.setup(self);
-        for (self.lanes.items, 0..) |_, i| {
-            var sensor = LaneSensor{ .lane_index = @intCast(u8, i) };
-            sensor.setup(self);
-            self.sensors.append(sensor) catch unreachable;
+        self.deserialize(test_1);
+    }
+
+    fn isUTurn(self: *const Self, l0: u8, l1: u8) bool {
+        const lane0 = self.lanes.items[l0];
+        const lane1 = self.lanes.items[l1];
+        if (lane0.lane == .outgoing and lane1.lane == .incoming) {
+            if (lane0.direction.isOpposite(lane1.direction)) return true;
         }
-        {
-            var car: Car = undefined;
-            car.deserialize("car|1|3");
-            helpers.debugPrint("{s}", .{car.serialize(self.arena)});
-        }
-        {
-            var sig: Signal = undefined;
-            sig.deserialize("sig|0|green");
-            helpers.debugPrint("{s}", .{sig.serialize(self.arena)});
-        }
-        self.resetLevel();
-        // // connections
-        // self.connections.append(.{
-        //     .effect = .set_green,
-        //     .sensor_index = 0,
-        //     .signal_index = 1,
-        // }) catch unreachable;
+        return false;
     }
 
     /// to store the initial level start values of all the signals
@@ -468,15 +508,15 @@ const Intersection = struct {
         collision_check: {
             for (paths.items, 0..) |path, i| {
                 for (paths.items[i + 1 ..]) |path2| {
-                    if (path.intersects(path2)) {
+                    if (path.intersects(path2)) |point| {
                         crashed = true;
+                        self.crash_point = point;
                         break :collision_check;
                     }
                 }
             }
         }
         if (crashed) {
-            self.crashed = true;
             for (self.cars.items) |*car| {
                 if (car.done) continue;
                 car.progress = @min(car.progress, 0.45);
@@ -596,6 +636,7 @@ const Intersection = struct {
         self.resetCars();
         self.resetSignals();
         self.show_crash = false;
+        self.crash_point = null;
         self.steps = 0;
     }
 
@@ -615,9 +656,14 @@ const Intersection = struct {
         }
     }
 
+    fn clearConnections(self: *Self) void {
+        self.connections.clearRetainingCapacity();
+    }
+
     fn deserialize(self: *Self, str: []const u8) void {
         self.cars.clearRetainingCapacity();
         self.signals.clearRetainingCapacity();
+        self.sensors.clearRetainingCapacity();
         var tokens = std.mem.split(u8, str, " ");
         while (tokens.next()) |token| {
             if (std.mem.eql(u8, token[0..3], "car")) {
@@ -631,6 +677,12 @@ const Intersection = struct {
                 sig.deserialize(token);
                 sig.setup(self);
                 self.signals.append(sig) catch unreachable;
+            }
+            if (std.mem.eql(u8, token[0..3], "sen")) {
+                var sen: LaneSensor = undefined;
+                sen.deserialize(token);
+                sen.setup(self);
+                self.sensors.append(sen) catch unreachable;
             }
         }
         self.setSignalStates();
@@ -646,6 +698,11 @@ const Intersection = struct {
         }
         for (self.signals.items) |sig| {
             var tok = sig.serialize(arena);
+            str.appendSlice(tok) catch unreachable;
+            str.append(' ') catch unreachable;
+        }
+        for (self.sensors.items) |sen| {
+            var tok = sen.serialize(arena);
             str.appendSlice(tok) catch unreachable;
             str.append(' ') catch unreachable;
         }
@@ -721,24 +778,46 @@ pub const Game = struct {
         self.arena = self.arena_handle.allocator();
         self.ticks = ticks;
         self.cursor = .default;
-        if (self.haathi.inputs.getKey(.space).is_clicked) self.intersection.step();
-        if (self.haathi.inputs.getKey(.r).is_clicked) self.intersection.resetLevel();
-        if (self.haathi.inputs.getKey(.num_1).is_clicked) self.dev_mode = !self.dev_mode;
+        if (!self.dev_mode) {
+            if (self.haathi.inputs.getKey(.space).is_clicked) self.intersection.step();
+            if (self.haathi.inputs.getKey(.r).is_clicked) self.intersection.resetLevel();
+        }
+        if (self.haathi.inputs.getKey(.num_1).is_clicked) self.toggleDevMode();
         if (self.dev_mode and self.haathi.inputs.getKey(.s).is_clicked) helpers.debugPrint("{s}", .{self.intersection.serialize(self.arena)});
         if (self.dev_mode and self.haathi.inputs.getKey(.t).is_clicked) self.intersection.deserialize(test_1);
+        if (self.dev_mode and self.haathi.inputs.getKey(.w).is_clicked) {
+            for (self.intersection.cars.items) |*car| {
+                car.target_position = Path.initIntersection(car.source_lane_index, car.destination_lane_index, &self.intersection);
+                car.progress = 0.9;
+            }
+        }
         self.intersection.update(ticks, self.arena);
         self.updateMouse();
+    }
+
+    fn toggleDevMode(self: *Self) void {
+        self.dev_mode = !self.dev_mode;
+        self.intersection.clearConnections();
+        self.intersection.resetLevel();
     }
 
     fn updateMouse(self: *Self) void {
         const mouse_pos = self.haathi.inputs.mouse.current_pos;
         if (self.dev_mode) {
             if (self.haathi.inputs.mouse.l_button.is_clicked) {
+                // if clicked on sensor toggle sensor enable
+                for (self.intersection.sensors.items) |*sensor| {
+                    if (sensor.rect.contains(mouse_pos)) {
+                        sensor.disabled = !sensor.disabled;
+                        return;
+                    }
+                }
                 // if clicked on lane, add car to lane.
                 for (self.intersection.lanes.items, 0..) |lane, i| {
                     if (lane.lane == .outgoing) continue;
                     if (lane.rect.contains(mouse_pos)) {
                         self.intersection.addCar(@intCast(u8, i), @intCast(u8, i + 1));
+                        return;
                     }
                 }
                 // if clicked on signal, toggle signal.
@@ -746,15 +825,31 @@ pub const Game = struct {
                     if (signal.rect.contains(mouse_pos)) {
                         signal.setEffect(.toggle);
                         self.intersection.setSignalStates();
+                        return;
                     }
                 }
             }
             if (self.haathi.inputs.mouse.r_button.is_clicked) {
+                // if clicked on sensor toggle sensor enable
+                for (self.intersection.sensors.items) |*sensor| {
+                    if (sensor.rect.contains(mouse_pos)) {
+                        sensor.disabled = !sensor.disabled;
+                        return;
+                    }
+                }
                 // if clicked on lane, remove 1 car from lane.
                 for (self.intersection.lanes.items, 0..) |lane, i| {
                     if (lane.lane == .outgoing) continue;
                     if (lane.rect.contains(mouse_pos)) {
                         self.intersection.removeCar(@intCast(u8, i));
+                        return;
+                    }
+                }
+                // if clicked on signal, toggle signal enable
+                for (self.intersection.signals.items) |*signal| {
+                    if (signal.rect.contains(mouse_pos)) {
+                        signal.disabled = !signal.disabled;
+                        return;
                     }
                 }
             }
@@ -765,7 +860,14 @@ pub const Game = struct {
                         const current = std.mem.indexOfScalar(u8, destination_lanes[0..], car.destination_lane_index).?;
                         const next_index = helpers.applyChangeLooped(@intCast(u8, current), @intCast(i8, std.math.sign(self.haathi.inputs.mouse.wheel_y)), destination_lanes.len - 1);
                         car.destination_lane_index = destination_lanes[next_index];
-                        break;
+                        return;
+                    }
+                }
+                // if clicked on sensor toggle sensor enable
+                for (self.intersection.sensors.items) |*sensor| {
+                    if (sensor.rect.contains(mouse_pos)) {
+                        sensor.num_slots = if (sensor.num_slots == 2) 1 else 2;
+                        return;
                     }
                 }
             }
@@ -775,6 +877,7 @@ pub const Game = struct {
             .idle => |_| {
                 self.state.idle.hovered_sensor = null;
                 for (self.intersection.sensors.items, 0..) |sensor, sensor_index| {
+                    if (sensor.disabled) continue;
                     if (sensor.rect.contains(mouse_pos)) {
                         for (sensor.slots(), 0..) |slot, slot_index| {
                             if (slot.contains(mouse_pos)) {
@@ -787,6 +890,7 @@ pub const Game = struct {
                         }
                     }
                 }
+                if (!self.interactionsAllowed()) return;
                 if (self.haathi.inputs.mouse.l_button.is_clicked) {
                     if (self.intersection.steps == 0) {
                         if (self.state.idle.hovered_sensor) |hovered_sensor| {
@@ -819,6 +923,7 @@ pub const Game = struct {
                 self.state.creating_connection.ending_slot = null;
                 find_signal_slot: {
                     for (self.intersection.signals.items, 0..) |signal, signal_index| {
+                        if (signal.disabled) continue;
                         for (signal.slots, 0..) |slot, slot_index| {
                             if (slot.contains(mouse_pos)) {
                                 self.state.creating_connection.ending_slot = .{
@@ -839,8 +944,16 @@ pub const Game = struct {
             },
         }
     }
+
+    fn interactionsAllowed(self: *Self) bool {
+        return self.intersection.steps == 0;
+    }
+
     pub fn render(self: *Self) void {
-        self.haathi.setCursor(self.cursor);
+        if (self.interactionsAllowed())
+            self.haathi.setCursor(self.cursor)
+        else
+            self.haathi.setCursor(.default);
         self.haathi.drawRect(.{
             .position = .{},
             .size = SCREEN_SIZE,
@@ -862,25 +975,27 @@ pub const Game = struct {
                 });
             }
         }
+        const alpha: f32 = if (self.interactionsAllowed()) 1 else 0.3;
         for (self.intersection.sensors.items) |sensor| {
+            if (sensor.disabled) continue;
             self.haathi.drawRect(.{
                 .position = sensor.rect.position,
                 .size = sensor.rect.size,
                 .radius = 0,
-                .color = colors.solarized_base3,
+                .color = colors.solarized_base3.alpha(alpha),
             });
-            for (sensor.slots_memory[0..sensor.num_slots]) |slot| {
+            for (sensor.slots()) |slot| {
                 self.haathi.drawRect(.{
                     .position = slot.position,
                     .size = slot.size,
                     .radius = 2,
-                    .color = colors.solarized_base2,
+                    .color = colors.solarized_base2.alpha(alpha),
                 });
                 self.haathi.drawRect(.{
                     .position = slot.center(),
                     .size = .{ .x = 10, .y = 10 },
                     .radius = 10,
-                    .color = colors.solarized_base1,
+                    .color = colors.solarized_base1.alpha(alpha),
                     .centered = true,
                 });
             }
@@ -918,6 +1033,7 @@ pub const Game = struct {
             });
         }
         for (self.intersection.signals.items) |signal| {
+            if (signal.disabled) continue;
             self.haathi.drawRect(.{
                 .position = signal.rect.position,
                 .size = signal.rect.size,
@@ -992,6 +1108,7 @@ pub const Game = struct {
         }
         if (self.intersection.show_crash) {
             var crash = std.ArrayList(Vec2).init(self.arena);
+            const crash_point = self.intersection.crash_point orelse INTERSECTION_MIDPOINT;
             var rng = std.rand.DefaultPrng.init(42);
             var ang: f32 = 0;
             var inside: bool = true;
@@ -1000,7 +1117,7 @@ pub const Game = struct {
                 const rand = 0.4 + (rng.random().float(f32) * 0.6);
                 inside = !inside;
                 const first = Vec2{ .x = 1 };
-                crash.append(INTERSECTION_MIDPOINT.add(first.scale(size * rand).rotate(ang))) catch unreachable;
+                crash.append(crash_point.add(first.scale(size * rand).rotate(ang))) catch unreachable;
             }
             self.haathi.drawPoly(.{
                 .points = crash.items[0..],
@@ -1015,5 +1132,10 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
+        self.haathi.drawRect(.{
+            .position = .{ .x = PANE_X, .y = 0 },
+            .size = .{ .x = PANE_WIDTH, .y = SCREEN_SIZE.y },
+            .color = colors.solarized_base03,
+        });
     }
 };
