@@ -269,6 +269,15 @@ pub const Button = struct {
     }
 };
 
+pub const Line = struct {
+    p0: Vec2,
+    p1: Vec2,
+
+    pub fn intersects(self: *const Line, other: Line) ?Vec2 {
+        return lineSegmentsIntersect(self.p0, self.p1, other.p0, other.p1);
+    }
+};
+
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
     // Bezier Blend as per StackOverflow : https://stackoverflow.com/a/25730573/5453127
     // t goes between 0 and 1.
@@ -346,7 +355,6 @@ pub fn applyChangeLooped(value: u8, change: i8, max: u8) u8 {
 // pub fn enumCycleLooped(val: anytype, change: i8) @TypeOf(val) {
 //
 // }
-
 pub fn lineSegmentsIntersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) ?Vec2 {
     // sometimes it looks like single points are being passed in
     if (p1.equal(p2) and p2.equal(p3) and p3.equal(p4)) {

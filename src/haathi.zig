@@ -128,6 +128,7 @@ pub const Haathi = struct {
                     c.strokeStyle(color_buffer[0..].ptr);
                     c.lineWidth(path.width);
                     c.beginPath();
+                    c.moveTo(path.points[0].x, path.points[0].y);
                     for (path.points) |point| {
                         c.lineTo(point.x, point.y);
                     }

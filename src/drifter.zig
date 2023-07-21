@@ -10,23 +10,28 @@ const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
 const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
+const Line = helpers.Line;
 
 const FONT_1 = "18px JetBrainsMono";
+const FONT_2 = "26px JetBrainsMono";
 const INTERSECTION_MIDPOINT = Vec2{ .x = (SCREEN_SIZE.y * 0.5), .y = SCREEN_SIZE.y * 0.5 };
 const MID_POINT_INDEX = 16;
 
-const test_2 = "car|0|1 car|0|5 car|4|5 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|true sen|6|2|true sen|7|2|true";
-const test_1 = "car|0|1 car|4|7 sig|0|green|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|1|false";
+const test_1 = "car|0|1 car|0|5 car|2|5 sig|0|green|false sig|2|green|false sig|4|red|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true";
 
-const LEVELS = [_][]const u8{
-    "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false",
-};
+const LEVELS = [_][]const u8{ "car|0|5 car|0|5 car|2|5 car|2|5 sig|0|green|false sig|2|red|false sig|4|red|true sig|6|red|true sen|0|1|true sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|false sen|6|2|true sen|7|1|true", "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false", "car|0|1 car|0|5 car|4|5 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|true sen|6|2|true sen|7|2|true", "car|0|1 car|0|5 car|4|5 car|6|1 car|6|1 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|false sen|6|1|false sen|7|2|true" };
 
 const PANE_X = SCREEN_SIZE.y;
 const PANE_WIDTH = SCREEN_SIZE.x - SCREEN_SIZE.y;
 
 const CAR_SPACING = 50;
 const CAR_SIZE = Vec2{ .x = 30, .y = 40 };
+const CAR_CORNERS = [_]Vec2{
+    .{ .x = 15, .y = 20 },
+    .{ .x = -15, .y = 20 },
+    .{ .x = -15, .y = -20 },
+    .{ .x = 15, .y = -20 },
+};
 const LaneType = enum {
     incoming,
     outgoing,
@@ -45,6 +50,25 @@ const Direction = enum {
             .rightward => other == .leftward,
             .downward => other == .upward,
             .upward => other == .downward,
+        };
+    }
+    pub fn isStraight(self: *const Self, other: Self) bool {
+        return self.* == other;
+    }
+    pub fn isRightTurn(self: *const Self, other: Self) bool {
+        return switch (self.*) {
+            .leftward => other == .upward,
+            .rightward => other == .downward,
+            .downward => other == .leftward,
+            .upward => other == .rightward,
+        };
+    }
+    pub fn isLeftTurn(self: *const Self, other: Self) bool {
+        return switch (self.*) {
+            .leftward => other == .downward,
+            .rightward => other == .upward,
+            .downward => other == .rightward,
+            .upward => other == .leftward,
         };
     }
 };
@@ -263,16 +287,22 @@ const Path = struct {
         const end_lane = intersection.lanes.items[destination_lane_index];
         const start_curve = start_lane.head;
         const end_curve = end_lane.head;
-        const mid_point = if (start_lane.direction.isOpposite(end_lane.direction)) INTERSECTION_MIDPOINT.add(end_lane.toward.scale(-20)) else start_curve.lerp(end_curve, 0.5);
         const end = end_lane.head.add(end_lane.toward.scale(-SCREEN_SIZE.y * 0.6));
+        var mid_point = start_curve.lerp(end_curve, 0.5);
+        if (start_lane.direction.isOpposite(end_lane.direction))
+            mid_point = INTERSECTION_MIDPOINT.add(end_lane.toward.scale(-20));
+        if (start_lane.direction.isRightTurn(end_lane.direction))
+            mid_point = INTERSECTION_MIDPOINT.add(end_lane.toward.scale(20)).add(start_lane.toward.scale(20));
         self.points[0] = start;
+        self.points[1] = start_curve;
+        self.points[MID_POINT_INDEX] = mid_point;
+        self.points[self.points.len - 2] = end_curve;
         self.points[self.points.len - 1] = end;
-        for (1..MID_POINT_INDEX) |i| {
+        for (2..MID_POINT_INDEX) |i| {
             const fract = @floatFromInt(f32, i - 1) / (MID_POINT_INDEX - 1 - 1);
             self.points[i] = start_curve.lerp(mid_point, fract);
         }
-        self.points[MID_POINT_INDEX] = mid_point;
-        for (MID_POINT_INDEX + 1..self.points.len - 1) |i| {
+        for (MID_POINT_INDEX + 1..self.points.len - 2) |i| {
             const fract = @floatFromInt(f32, i - MID_POINT_INDEX + 1) / (self.points.len - 2);
             self.points[i] = mid_point.lerp(end_curve, fract);
         }
@@ -282,8 +312,8 @@ const Path = struct {
 
     pub fn initEndpoints(p0: Vec2, p1: Vec2) Self {
         var self: Self = undefined;
-        for (0..33) |i| {
-            const fract = @floatFromInt(f32, i) / self.points.len - 1;
+        for (0..self.points.len) |i| {
+            const fract = @floatFromInt(f32, i) / (self.points.len - 1);
             self.points[i] = p0.lerp(p1, fract);
         }
         self.initDistances();
@@ -304,8 +334,8 @@ const Path = struct {
 
     pub fn progress(self: *const Self, amount: f32) Vec2 {
         if (amount >= 1) return self.points[self.points.len - 1];
-        if (amount == 0) return self.points[0];
-        const dist = amount * self.cumulative_distance[self.points.len - 1];
+        if (amount <= 0) return self.points[0];
+        const dist = helpers.easeinoutf(0, 1, amount) * self.cumulative_distance[self.points.len - 1];
         for (self.points, self.cumulative_distance, 0..) |p1, d, i| {
             if (i == 0) continue;
             const prev_dist = self.cumulative_distance[i - 1];
@@ -320,24 +350,35 @@ const Path = struct {
     }
 
     pub fn intersects(self: *const Self, other: Self) ?Vec2 {
-        if (self.points[self.points.len - 2].distanceSqr(other.points[self.points.len - 2]) < 10) return self.points[self.points.len - 2];
-        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[1], other.points[self.points.len - 2])) |point| {
+        if (self.points[self.points.len - 1].distanceSqr(other.points[self.points.len - 1]) < 10) return self.points[self.points.len - 2];
+        const line1 = Line{
+            .p0 = self.points[1],
+            .p1 = self.points[MID_POINT_INDEX],
+        };
+        const line2 = Line{
+            .p0 = self.points[MID_POINT_INDEX],
+            .p1 = self.points[self.points.len - 2],
+        };
+        const line3 = Line{
+            .p0 = other.points[1],
+            .p1 = other.points[MID_POINT_INDEX],
+        };
+        const line4 = Line{
+            .p0 = other.points[MID_POINT_INDEX],
+            .p1 = other.points[other.points.len - 2],
+        };
+        if (line1.intersects(line3)) |point| {
             return point;
         }
-        if (helpers.lineSegmentsIntersect(self.points[1], self.points[MID_POINT_INDEX], other.points[1], other.points[self.points.len - 2])) |point| {
+        if (line1.intersects(line4)) |point| {
             return point;
         }
-        if (helpers.lineSegmentsIntersect(self.points[MID_POINT_INDEX], self.points[self.points.len - 2], other.points[1], other.points[self.points.len - 2])) |point| {
+        if (line2.intersects(line3)) |point| {
             return point;
         }
-        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[1], other.points[MID_POINT_INDEX])) |point| {
+        if (line2.intersects(line4)) |point| {
             return point;
         }
-        if (helpers.lineSegmentsIntersect(self.points[1], self.points[self.points.len - 2], other.points[MID_POINT_INDEX], other.points[self.points.len - 2])) |point| {
-            return point;
-        }
-        // TODO (19 Jul 2023 sam): U turn check. If 0 is doing u turn, and 6 is going straight
-        // they should crash, which this current check doesn't handle.
         return null;
     }
 };
@@ -401,6 +442,8 @@ const Intersection = struct {
     steps: u8 = 0,
     crash_point: ?Vec2 = null,
     show_crash: bool = false,
+    cleared: bool = false,
+    paths: [16]Path = undefined,
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
 
@@ -421,7 +464,7 @@ const Intersection = struct {
 
     fn setup(self: *Self) void {
         self.setupLanes();
-        self.deserialize(test_1);
+        self.setupPaths();
     }
 
     fn isUTurn(self: *const Self, l0: u8, l1: u8) bool {
@@ -482,18 +525,49 @@ const Intersection = struct {
         for (self.lanes.items) |*lane| lane.setup();
     }
 
+    /// just set up all the paths to draw;
+    fn setupPaths(self: *Self) void {
+        self.paths[0] = Path.initIntersection(0, 5, self);
+        // self.paths[1] = Path.initIntersection(2, 1, self);
+        // self.paths[2] = Path.initIntersection(4, 7, self);
+        // self.paths[3] = Path.initIntersection(6, 5, self);
+    }
+
     pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator) void {
         self.ticks = ticks;
         self.arena = arena;
         for (self.cars.items) |*car| car.update();
         self.checkForCollision();
+        self.checkForCleared();
+        // if (self.crash_point) |pos| {
+        //     if (self.show_crash) {
+        //         for (self.cars.items) |*car| {
+        //             if (car.done) continue;
+        //             if (!car.moved) continue;
+        //             car.position = pos;
+        //         }
+        //     }
+        // }
+    }
+
+    fn getLanePosition(self: *const Self, lane_index: u8, position: u8) Vec2 {
+        const lane = self.lanes.items[lane_index];
+        const offset_amount: f32 = 1 + @floatFromInt(f32, position);
+        const offset = lane.toward.scale(-1 * CAR_SPACING * offset_amount);
+        return lane.head.add(offset);
     }
 
     fn getCarPosition(self: *const Self, car: *const Car) Vec2 {
-        const lane = self.lanes.items[car.source_lane_index];
-        const offset_amount: f32 = 1 + @floatFromInt(f32, car.position_in_lane);
-        const offset = lane.toward.scale(-1 * CAR_SPACING * offset_amount);
-        return lane.head.add(offset);
+        return self.getLanePosition(car.source_lane_index, car.position_in_lane);
+    }
+
+    fn checkForCleared(self: *Self) void {
+        if (self.crash_point != null) return;
+        var cleared = true;
+        for (self.cars.items) |*car| {
+            if (!car.done) cleared = false;
+        }
+        self.cleared = cleared;
     }
 
     /// Check all the paths. If there is an intersection, then there is a collision
@@ -519,8 +593,8 @@ const Intersection = struct {
         if (crashed) {
             for (self.cars.items) |*car| {
                 if (car.done) continue;
-                car.progress = @min(car.progress, 0.45);
-                if (car.progress == 0.45) self.show_crash = true;
+                car.progress = @min(car.progress, 0.25);
+                if (car.progress == 0.25) self.show_crash = true;
             }
         }
     }
@@ -566,9 +640,9 @@ const Intersection = struct {
         for (self.cars.items) |*other_car| {
             if (other_car.moved) continue;
             if (other_car.source_lane_index == car.source_lane_index) {
+                other_car.target_position = Path.initEndpoints(self.getLanePosition(car.source_lane_index, other_car.position_in_lane), self.getLanePosition(car.source_lane_index, other_car.position_in_lane - 1));
                 other_car.position_in_lane -= 1;
                 other_car.progress = 0;
-                other_car.target_position = Path.initEndpoints(other_car.position, self.getCarPosition(other_car));
             }
         }
     }
@@ -623,11 +697,14 @@ const Intersection = struct {
     }
 
     fn removeCar(self: *Self, lane_index: u8) void {
-        for (self.cars.items, 0..) |car, i| {
+        var i: usize = self.cars.items.len - 1;
+        while (i >= 0) : (i -= 1) {
+            const car = self.cars.items[i];
             if (car.source_lane_index == lane_index) {
                 _ = self.cars.orderedRemove(i);
                 break;
             }
+            if (i == 0) break;
         }
         self.resetCars();
     }
@@ -638,6 +715,7 @@ const Intersection = struct {
         self.show_crash = false;
         self.crash_point = null;
         self.steps = 0;
+        self.cleared = false;
     }
 
     fn resetSignals(self: *Self) void {
@@ -750,6 +828,7 @@ pub const Game = struct {
     intersection: Intersection,
     cursor: CursorStyle = .default,
     dev_mode: bool = false,
+    level_index: u8 = 0,
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -758,13 +837,15 @@ pub const Game = struct {
     pub fn init(haathi: *Haathi) Self {
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        return .{
+        var self = Self{
             .haathi = haathi,
             .allocator = allocator,
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
             .intersection = Intersection.init(allocator, arena_handle.allocator()),
         };
+        self.intersection.deserialize(LEVELS[self.level_index]);
+        return self;
     }
 
     pub fn deinit(self: *Self) void {
@@ -783,14 +864,9 @@ pub const Game = struct {
             if (self.haathi.inputs.getKey(.r).is_clicked) self.intersection.resetLevel();
         }
         if (self.haathi.inputs.getKey(.num_1).is_clicked) self.toggleDevMode();
+        if (self.haathi.inputs.getKey(.n).is_clicked) self.setNextLevel();
         if (self.dev_mode and self.haathi.inputs.getKey(.s).is_clicked) helpers.debugPrint("{s}", .{self.intersection.serialize(self.arena)});
         if (self.dev_mode and self.haathi.inputs.getKey(.t).is_clicked) self.intersection.deserialize(test_1);
-        if (self.dev_mode and self.haathi.inputs.getKey(.w).is_clicked) {
-            for (self.intersection.cars.items) |*car| {
-                car.target_position = Path.initIntersection(car.source_lane_index, car.destination_lane_index, &self.intersection);
-                car.progress = 0.9;
-            }
-        }
         self.intersection.update(ticks, self.arena);
         self.updateMouse();
     }
@@ -799,6 +875,11 @@ pub const Game = struct {
         self.dev_mode = !self.dev_mode;
         self.intersection.clearConnections();
         self.intersection.resetLevel();
+    }
+
+    fn setNextLevel(self: *Self) void {
+        self.level_index = helpers.applyChangeLooped(self.level_index, 1, LEVELS.len - 1);
+        self.intersection.deserialize(LEVELS[self.level_index]);
     }
 
     fn updateMouse(self: *Self) void {
@@ -959,6 +1040,15 @@ pub const Game = struct {
             .size = SCREEN_SIZE,
             .color = colors.solarized_base3,
         });
+        for (self.intersection.paths) |path| {
+            var points = self.arena.alloc(Vec2, 33) catch unreachable;
+            for (path.points, 0..) |point, i| points[i] = point;
+            self.haathi.drawPath(.{
+                .points = points[0..],
+                .color = colors.solarized_base2,
+                .width = 60,
+            });
+        }
         for (self.intersection.lanes.items, 0..) |lane, i| {
             self.haathi.drawRect(.{
                 .position = lane.rect.position,
@@ -1130,6 +1220,20 @@ pub const Game = struct {
                 .position = .{ .x = 60, .y = 30 },
                 .color = colors.solarized_blue,
                 .style = FONT_1,
+            });
+        }
+        if (self.intersection.cleared) {
+            self.haathi.drawText(.{
+                .text = "Intersection",
+                .position = INTERSECTION_MIDPOINT.add(.{ .y = -10 }),
+                .color = colors.solarized_base03,
+                .style = FONT_2,
+            });
+            self.haathi.drawText(.{
+                .text = "Cleared",
+                .position = INTERSECTION_MIDPOINT.add(.{ .y = 20 }),
+                .color = colors.solarized_base03,
+                .style = FONT_2,
             });
         }
         self.haathi.drawRect(.{
