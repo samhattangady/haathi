@@ -25,9 +25,13 @@ const Level = struct {
     data: []const u8,
 };
 const LEVELS = [_]Level{
+    // .{
+    //     .data = "car|0|1 car|4|5 sig|0|green|false sig|2|red|true sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
+    //     .name = "Crash Test",
+    // },
     .{
-        .data = "car|0|1 car|4|5 sig|0|green|false sig|2|red|true sig|4|red|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
-        .name = "After You",
+        .data = "car|0|1 car|6|7 sig|0|green|false sig|2|red|true sig|4|red|true sig|6|red|false sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
+        .name = "Chivanry",
     },
     .{
         .data = "car|0|1 car|0|7 car|4|5 sig|0|green|false sig|2|red|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
@@ -42,16 +46,36 @@ const LEVELS = [_]Level{
         .name = "Eventual Synchronisation",
     },
     .{
-        .data = "car|4|5 car|0|1 car|4|3 car|2|3 car|0|5 sig|0|green|false sig|2|green|false sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|2|true sen|5|1|true sen|6|1|true sen|7|2|true",
-        .name = "Incoming",
-    },
-    .{
         .data = "car|0|5 car|0|5 car|2|5 car|2|5 sig|0|green|false sig|2|red|false sig|4|red|true sig|6|red|true sen|0|1|true sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|false sen|6|2|true sen|7|1|true",
         .name = "Eastward Bound",
     },
     .{
+        .data = "car|4|1 car|0|7 car|0|7 car|6|1 sig|0|green|false sig|2|red|true sig|4|green|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|false",
+        .name = "Uncoupled",
+    },
+    .{
+        .data = "car|0|1 car|2|1 car|6|5 car|4|7 car|0|3 car|0|3 car|4|7 car|2|1 car|6|5 sig|0|green|false sig|2|red|false sig|4|red|false sig|6|red|false sen|0|2|false sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|2|true",
+        .name = "Cloverleaf",
+    },
+    .{
+        .data = "car|0|1 car|0|5 car|0|7 car|0|3 car|4|1 car|4|5 car|4|1 car|4|7 sig|0|green|false sig|2|red|true sig|4|red|false sig|6|red|true sen|0|2|false sen|1|1|true sen|2|1|true sen|3|1|true sen|4|2|false sen|5|1|true sen|6|2|true sen|7|1|true",
+        .name = "Carfectly Balanced",
+    },
+    .{
+        .data = "car|4|5 car|0|1 car|4|3 car|2|3 car|0|5 sig|0|green|false sig|2|green|false sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|2|true sen|5|1|true sen|6|1|true sen|7|2|true",
+        .name = "Incoming",
+    },
+    .{
+        .data = "car|0|1 car|6|7 car|6|3 car|0|5 sig|0|green|false sig|2|red|true sig|4|red|true sig|6|red|false sen|0|2|false sen|1|1|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|1|false sen|7|1|true",
+        .name = "Opportune",
+    },
+    .{
         .data = "car|0|7 car|0|5 car|4|3 car|6|3 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|2|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|1|true sen|5|1|true sen|6|1|false sen|7|2|true",
         .name = "Trafficic",
+    },
+    .{
+        .data = "car|0|5 car|0|7 car|6|1 car|6|5 car|0|1 sig|0|green|false sig|2|red|true sig|4|green|true sig|6|red|false sen|0|2|false sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|false sen|6|2|true sen|7|1|true",
+        .name = "Vantuos",
     },
     .{
         .data = "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false",
@@ -69,6 +93,15 @@ const LEVELS = [_]Level{
         .data = "car|0|1 car|0|7 car|0|5 car|0|3 car|4|5 car|2|3 car|6|7 sig|0|green|false sig|2|red|false sig|4|red|false sig|6|red|false sen|0|1|true sen|1|2|false sen|2|1|true sen|3|2|false sen|4|1|true sen|5|2|false sen|6|2|true sen|7|2|false",
         .name = "Complicated != Complex",
     },
+};
+
+const TUTORIAL = [_][]const u8{
+    "Some lanes are equipped with sensors",
+    "Cars travelling over sensors will trigger them",
+    "Sensors can be used to set or toggle signals",
+    "Drag from sensor to signal to connect them",
+    "Click the step button to progress the simulation",
+    "Try to clear up these intersections",
 };
 
 const PANE_X = SCREEN_SIZE.y;
@@ -214,6 +247,7 @@ const LaneSensor = struct {
     num_slots: u8 = 2,
     disabled: bool = false,
     slots_memory: [4]Rect = undefined,
+    slot_extensions_memory: [4]Vec2 = undefined,
 
     pub fn setup(self: *Self, intersection: *const Intersection) void {
         const lane = intersection.lanes.items[self.lane_index];
@@ -224,11 +258,17 @@ const LaneSensor = struct {
         const v1 = v0.add(lane.perp.scale(50));
         self.slots_memory[0] = .{ .position = v0, .size = lane.perp.scale(20).add(lane.toward.scale(20)) };
         self.slots_memory[1] = .{ .position = v1, .size = lane.perp.scale(-20).add(lane.toward.scale(20)) };
+        self.slot_extensions_memory[0] = self.slots_memory[0].center().add(lane.perp.scale(-20));
+        self.slot_extensions_memory[1] = self.slots_memory[1].center().add(lane.perp.scale(20));
         std.debug.assert(self.num_slots <= 2); // have to make this dynamic if we have 3 or 4
     }
 
     pub fn slots(self: *const Self) []const Rect {
         return self.slots_memory[0..self.num_slots];
+    }
+
+    pub fn slot_extensions(self: *const Self) []const Vec2 {
+        return self.slot_extensions_memory[0..self.num_slots];
     }
 
     pub fn deserialize(self: *Self, str: []const u8) void {
@@ -261,6 +301,7 @@ const Signal = struct {
     rect: Rect = undefined,
     positions: [NUM_SIGNAL_STATES]Vec2 = [_]Vec2{.{}} ** NUM_SIGNAL_STATES,
     slots: [3]Rect = undefined,
+    slot_extension: [3]Vec2 = undefined,
     disabled: bool = false,
 
     pub fn setup(self: *Self, intersection: *const Intersection) void {
@@ -287,6 +328,9 @@ const Signal = struct {
             .position = self.rect.position.add(lane.perp.scale(40)),
             .size = lane.toward.scale(20).add(lane.perp.scale(20)),
         };
+        self.slot_extension[0] = self.slots[0].center().add(lane.perp.scale(-15));
+        self.slot_extension[1] = self.slots[1].center().add(lane.toward.scale(15));
+        self.slot_extension[2] = self.slots[2].center().add(lane.perp.scale(15));
     }
 
     pub fn isGreen(self: *const Self) bool {
@@ -408,6 +452,18 @@ const Path = struct {
         return self.points[self.points.len - 1];
     }
 
+    pub fn closestPointProgress(self: *const Self, point: Vec2) ?f32 {
+        for (self.points[0 .. self.points.len - 1], self.points[1..], 0..) |p0, p1, i| {
+            const line = Line{ .p0 = p0, .p1 = p1 };
+            if (helpers.pointToLineDistanceSqr(point, line) < 25) {
+                const t = line.unlerp(point);
+                const extra = (t * (self.cumulative_distance[i + 1] - self.cumulative_distance[i])) / self.cumulative_distance[self.points.len - 1];
+                return extra + (self.cumulative_distance[i] / self.cumulative_distance[self.points.len - 1]);
+            }
+        }
+        return null;
+    }
+
     pub fn intersects(self: *const Self, other: Self) ?Vec2 {
         if (self.points[self.points.len - 1].distanceSqr(other.points[self.points.len - 1]) < 10) return self.points[self.points.len - 2];
         const line1 = Line{
@@ -449,6 +505,7 @@ const Car = struct {
     position_in_lane: u8 = undefined,
     position: Vec2 = undefined,
     target_position: ?Path = null,
+    crashed: bool = false,
     moved: bool = false,
     done: bool = false,
     progress: f32 = 0,
@@ -460,13 +517,23 @@ const Car = struct {
     pub fn reset(self: *Self, intersection: *const Intersection) void {
         self.moved = false;
         self.done = false;
+        self.crashed = false;
         self.progress = 0;
         self.target_position = null;
         self.setup(intersection);
     }
 
-    pub fn update(self: *Self) void {
+    pub fn update(self: *Self, intersection: *const Intersection) void {
+        if (self.crashed) return;
+        var max_progress: f32 = 1;
+        if (intersection.crash_point) |point| {
+            if (self.target_position) |path| max_progress = path.closestPointProgress(point) orelse 1;
+        }
         self.progress += 0.01;
+        if (self.progress < 1 and self.progress > max_progress) {
+            self.progress = max_progress;
+            self.crashed = true;
+        }
         if (self.target_position) |tpos| {
             self.position = tpos.progress(self.progress);
         }
@@ -498,11 +565,10 @@ const Intersection = struct {
     cars: std.ArrayList(Car),
     signal_states: std.ArrayList(SignalState),
     ticks: u64 = 0,
-    steps: u8 = 0,
+    steps: usize = 0,
     crash_point: ?Vec2 = null,
     show_crash: bool = false,
     cleared: bool = false,
-    paths: [16]Path = undefined,
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
 
@@ -523,7 +589,6 @@ const Intersection = struct {
 
     fn setup(self: *Self) void {
         self.setupLanes();
-        self.setupPaths();
     }
 
     fn isUTurn(self: *const Self, l0: u8, l1: u8) bool {
@@ -584,18 +649,10 @@ const Intersection = struct {
         for (self.lanes.items) |*lane| lane.setup();
     }
 
-    /// just set up all the paths to draw;
-    fn setupPaths(self: *Self) void {
-        self.paths[0] = Path.initIntersection(0, 5, self);
-        // self.paths[1] = Path.initIntersection(2, 1, self);
-        // self.paths[2] = Path.initIntersection(4, 7, self);
-        // self.paths[3] = Path.initIntersection(6, 5, self);
-    }
-
     pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator) void {
         self.ticks = ticks;
         self.arena = arena;
-        for (self.cars.items) |*car| car.update();
+        for (self.cars.items) |*car| car.update(self);
         self.checkForCollision();
         self.checkForCleared();
         // if (self.crash_point) |pos| {
@@ -652,8 +709,7 @@ const Intersection = struct {
         if (crashed) {
             for (self.cars.items) |*car| {
                 if (car.done) continue;
-                car.progress = @min(car.progress, 0.25);
-                if (car.progress == 0.25) self.show_crash = true;
+                if (car.crashed) self.show_crash = true;
             }
         }
     }
@@ -1193,15 +1249,6 @@ pub const Game = struct {
             .size = SCREEN_SIZE,
             .color = colors.solarized_base3,
         });
-        for (self.intersection.paths) |path| {
-            var points = self.arena.alloc(Vec2, 33) catch unreachable;
-            for (path.points, 0..) |point, i| points[i] = point;
-            self.haathi.drawPath(.{
-                .points = points[0..],
-                .color = colors.solarized_base2,
-                .width = 60,
-            });
-        }
         for (self.intersection.lanes.items, 0..) |lane, i| {
             self.haathi.drawRect(.{
                 .position = lane.rect.position,
@@ -1244,13 +1291,34 @@ pub const Game = struct {
             }
         }
         for (self.intersection.connections.items) |conn| {
-            var points = self.arena.alloc(Vec2, 2) catch unreachable;
+            var points = self.arena.alloc(Vec2, 4) catch unreachable;
             points[0] = self.intersection.sensors.items[conn.sensor_slot.sensor_index].slots()[conn.sensor_slot.slot_index].center();
-            points[1] = self.intersection.signals.items[conn.signal_slot.signal_index].slots[conn.signal_slot.slot_index].center();
+            points[1] = self.intersection.sensors.items[conn.sensor_slot.sensor_index].slot_extensions()[conn.sensor_slot.slot_index];
+            points[2] = self.intersection.signals.items[conn.signal_slot.signal_index].slot_extension[conn.signal_slot.slot_index];
+            points[3] = self.intersection.signals.items[conn.signal_slot.signal_index].slots[conn.signal_slot.slot_index].center();
+            self.haathi.drawRect(.{
+                .position = points[0],
+                .size = .{ .x = 12, .y = 12 },
+                .centered = true,
+                .radius = 12,
+                .color = colors.solarized_base2,
+            });
             self.haathi.drawPath(.{
                 .points = points,
                 .width = 8,
                 .color = colors.solarized_base2,
+            });
+            self.haathi.drawRect(.{
+                .position = points[0],
+                .size = .{ .x = 6, .y = 6 },
+                .centered = true,
+                .radius = 6,
+                .color = colors.solarized_base01,
+            });
+            self.haathi.drawPath(.{
+                .points = points,
+                .width = 3,
+                .color = colors.solarized_base01,
             });
         }
         for (self.intersection.cars.items) |car| {
@@ -1335,18 +1403,35 @@ pub const Game = struct {
             }
         }
         if (self.state == .creating_connection) {
-            var points = self.arena.alloc(Vec2, 2) catch unreachable;
+            var points = self.arena.alloc(Vec2, 4) catch unreachable;
             const sensor_slot = self.state.creating_connection.starting_slot;
             points[0] = self.intersection.sensors.items[sensor_slot.sensor_index].slots()[sensor_slot.slot_index].center();
+            points[1] = self.intersection.sensors.items[sensor_slot.sensor_index].slot_extensions()[sensor_slot.slot_index];
             if (self.state.creating_connection.ending_slot) |signal_slot| {
-                points[1] = self.intersection.signals.items[signal_slot.signal_index].slots[signal_slot.slot_index].center();
+                points[2] = self.intersection.signals.items[signal_slot.signal_index].slot_extension[signal_slot.slot_index];
+                points[3] = self.intersection.signals.items[signal_slot.signal_index].slots[signal_slot.slot_index].center();
             } else {
-                points[1] = self.haathi.inputs.mouse.current_pos;
+                points[2] = self.haathi.inputs.mouse.current_pos;
+                points[3] = self.haathi.inputs.mouse.current_pos;
             }
+            self.haathi.drawRect(.{
+                .position = points[0],
+                .size = .{ .x = 6, .y = 6 },
+                .centered = true,
+                .radius = 6,
+                .color = colors.solarized_base03,
+            });
+            self.haathi.drawRect(.{
+                .position = points[3],
+                .size = .{ .x = 6, .y = 6 },
+                .centered = true,
+                .radius = 6,
+                .color = colors.solarized_base1,
+            });
             self.haathi.drawPath(.{
                 .points = points,
-                .width = 8,
-                .color = colors.solarized_base1,
+                .width = 3,
+                .color = colors.solarized_base03,
             });
         }
         if (self.intersection.show_crash) {
@@ -1433,9 +1518,29 @@ pub const Game = struct {
                 .color = colors.solarized_base00,
             });
         }
+        // title and tutorial
+        {
+            var pos = Vec2{ .x = PANE_X + (PANE_WIDTH / 2), .y = PANE_PADDING + 12 };
+            self.haathi.drawText(.{
+                .text = "Sensors n Signals",
+                .position = pos,
+                .style = FONT_1,
+                .color = colors.solarized_base1,
+            });
+            pos.y += 32;
+            for (TUTORIAL) |line| {
+                self.haathi.drawText(.{
+                    .text = line,
+                    .position = pos,
+                    .style = FONT_1,
+                    .color = colors.solarized_base00,
+                });
+                pos.y += 24;
+            }
+        }
         // draw level completions
         {
-            const indicator_size = Vec2{ .x = 30, .y = 24 };
+            const indicator_size = Vec2{ .x = 18, .y = 18 };
             const width = PANE_WIDTH - (PANE_PADDING * 2);
             const padding = (width - (indicator_size.x * @floatFromInt(f32, LEVELS.len))) / @floatFromInt(f32, LEVELS.len - 1);
             const start_x = PANE_X + PANE_PADDING;

@@ -276,6 +276,18 @@ pub const Line = struct {
     pub fn intersects(self: *const Line, other: Line) ?Vec2 {
         return lineSegmentsIntersect(self.p0, self.p1, other.p0, other.p1);
     }
+
+    /// projects the point onto the line, and then returns the fract of that projected point
+    /// along the line, where 0 is p0 and 1 is p1
+    pub fn unlerp(self: *const Line, point: Vec2) f32 {
+        // TODO (21 Jul 2023 sam): Check if this works. Copied over...
+        const l_sqr = self.p0.distanceSqr(self.p1);
+        if (l_sqr == 0.0) return 0.0;
+        // TODO (02 Feb 2022 sam): Why is this divided by l_sqr and not l? Does dot product
+        // return a squared length of projected line length?
+        const t = point.subtract(self.p0).dot(self.p1.subtract(self.p0)) / l_sqr;
+        return t;
+    }
 };
 
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
@@ -382,6 +394,15 @@ pub fn lineSegmentsIntersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) ?Vec2 {
     } else {
         return null;
     }
+}
+
+pub fn pointToLineDistanceSqr(point: Vec2, line: Line) f32 {
+    // TODO (21 Jul 2023 sam): Check if this works. Copied over...
+    const l_sqr = line.p0.distanceSqr(line.p1);
+    if (l_sqr == 0.0) return line.p0.distanceSqr(point);
+    const t = std.math.clamp(point.subtract(line.p0).dot(line.p1.subtract(line.p0)) / l_sqr, 0.0, 1.0);
+    const projected = line.p0.add(line.p1.subtract(line.p0).scale(t));
+    return point.distanceSqr(projected);
 }
 
 pub fn parseBool(token: []const u8) !bool {
