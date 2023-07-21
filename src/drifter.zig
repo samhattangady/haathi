@@ -50,7 +50,7 @@ const LEVELS = [_]Level{
         .name = "Eastward Bound",
     },
     .{
-        .data = "car|4|1 car|0|7 car|0|7 car|6|1 sig|0|green|false sig|2|red|true sig|4|green|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|false",
+        .data = "car|4|1 car|0|5 car|0|5 car|6|1 sig|0|green|false sig|2|red|true sig|4|green|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|1|false sen|6|2|true sen|7|1|true",
         .name = "Uncoupled",
     },
     .{
