@@ -10,6 +10,7 @@ const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
 const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
+const Button = helpers.Button;
 const Line = helpers.Line;
 
 const FONT_1 = "18px JetBrainsMono";
@@ -19,10 +20,60 @@ const MID_POINT_INDEX = 16;
 
 const test_1 = "car|0|1 car|0|5 car|2|5 sig|0|green|false sig|2|green|false sig|4|red|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true";
 
-const LEVELS = [_][]const u8{ "car|0|5 car|0|5 car|2|5 car|2|5 sig|0|green|false sig|2|red|false sig|4|red|true sig|6|red|true sen|0|1|true sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|false sen|6|2|true sen|7|1|true", "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false", "car|0|1 car|0|5 car|4|5 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|true sen|6|2|true sen|7|2|true", "car|0|1 car|0|5 car|4|5 car|6|1 car|6|1 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|false sen|6|1|false sen|7|2|true" };
+const Level = struct {
+    name: []const u8,
+    data: []const u8,
+};
+const LEVELS = [_]Level{
+    .{
+        .data = "car|0|1 car|4|5 sig|0|green|false sig|2|red|true sig|4|red|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
+        .name = "After You",
+    },
+    .{
+        .data = "car|0|1 car|0|7 car|4|5 sig|0|green|false sig|2|red|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|true sen|6|2|true sen|7|1|true",
+        .name = "Non Interference",
+    },
+    .{
+        .data = "car|0|1 car|0|5 car|4|5 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|true sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|true sen|6|2|true sen|7|2|true",
+        .name = "Double Minded",
+    },
+    .{
+        .data = "car|0|7 car|0|7 car|2|5 car|0|7 car|0|7 car|4|1 car|4|1 car|4|1 car|2|5 car|2|5 car|6|3 car|6|3 sig|0|green|false sig|2|red|false sig|4|red|false sig|6|red|false sen|0|1|true sen|1|1|false sen|2|1|true sen|3|1|true sen|4|1|true sen|5|1|false sen|6|2|true sen|7|1|false",
+        .name = "Eventual Synchronisation",
+    },
+    .{
+        .data = "car|4|5 car|0|1 car|4|3 car|2|3 car|0|5 sig|0|green|false sig|2|green|false sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|2|true sen|5|1|true sen|6|1|true sen|7|2|true",
+        .name = "Incoming",
+    },
+    .{
+        .data = "car|0|5 car|0|5 car|2|5 car|2|5 sig|0|green|false sig|2|red|false sig|4|red|true sig|6|red|true sen|0|1|true sen|1|2|true sen|2|1|true sen|3|2|true sen|4|1|true sen|5|2|false sen|6|2|true sen|7|1|true",
+        .name = "Eastward Bound",
+    },
+    .{
+        .data = "car|0|7 car|0|5 car|4|3 car|6|3 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|2|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|1|true sen|5|1|true sen|6|1|false sen|7|2|true",
+        .name = "Trafficic",
+    },
+    .{
+        .data = "car|0|7 car|0|7 car|2|7 car|4|1 car|4|5 sig|0|red|false sig|2|red|false sig|4|green|false sig|6|red|true sen|0|1|true sen|1|1|false sen|2|2|true sen|3|2|true sen|4|1|true sen|5|1|true sen|6|2|true sen|7|2|false",
+        .name = "Sharing is Car ing",
+    },
+    .{
+        .data = "car|4|7 car|0|3 car|0|5 car|6|7 car|6|3 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|true sen|2|2|true sen|3|1|false sen|4|2|true sen|5|1|true sen|6|1|true sen|7|1|false",
+        .name = "Sensomatic",
+    },
+    .{
+        .data = "car|0|1 car|0|5 car|4|5 car|6|1 car|6|1 sig|0|green|false sig|2|green|true sig|4|red|false sig|6|red|false sen|0|1|false sen|1|1|false sen|2|2|true sen|3|2|true sen|4|2|true sen|5|1|false sen|6|1|false sen|7|2|true",
+        .name = "Sighetti",
+    },
+    .{
+        .data = "car|0|1 car|0|7 car|0|5 car|0|3 car|4|5 car|2|3 car|6|7 sig|0|green|false sig|2|red|false sig|4|red|false sig|6|red|false sen|0|1|true sen|1|2|false sen|2|1|true sen|3|2|false sen|4|1|true sen|5|2|false sen|6|2|true sen|7|2|false",
+        .name = "Complicated != Complex",
+    },
+};
 
 const PANE_X = SCREEN_SIZE.y;
 const PANE_WIDTH = SCREEN_SIZE.x - SCREEN_SIZE.y;
+const PANE_PADDING = 30;
 
 const CAR_SPACING = 50;
 const CAR_SIZE = Vec2{ .x = 30, .y = 40 };
@@ -35,6 +86,14 @@ const CAR_CORNERS = [_]Vec2{
 const LaneType = enum {
     incoming,
     outgoing,
+};
+
+const ButtonAction = enum {
+    prev_level,
+    next_level,
+    reset_level,
+    clear_level,
+    step_forward,
 };
 
 const Direction = enum {
@@ -735,6 +794,7 @@ const Intersection = struct {
     }
 
     fn clearConnections(self: *Self) void {
+        self.resetLevel();
         self.connections.clearRetainingCapacity();
     }
 
@@ -742,6 +802,7 @@ const Intersection = struct {
         self.cars.clearRetainingCapacity();
         self.signals.clearRetainingCapacity();
         self.sensors.clearRetainingCapacity();
+        self.connections.clearRetainingCapacity();
         var tokens = std.mem.split(u8, str, " ");
         while (tokens.next()) |token| {
             if (std.mem.eql(u8, token[0..3], "car")) {
@@ -828,7 +889,9 @@ pub const Game = struct {
     intersection: Intersection,
     cursor: CursorStyle = .default,
     dev_mode: bool = false,
+    levels_complete: [LEVELS.len]bool = [_]bool{false} ** LEVELS.len,
     level_index: u8 = 0,
+    buttons: std.ArrayList(Button),
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -842,14 +905,16 @@ pub const Game = struct {
             .allocator = allocator,
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
+            .buttons = std.ArrayList(Button).init(allocator),
             .intersection = Intersection.init(allocator, arena_handle.allocator()),
         };
-        self.intersection.deserialize(LEVELS[self.level_index]);
+        self.intersection.deserialize(LEVELS[self.level_index].data);
+        self.setupButtons();
         return self;
     }
 
     pub fn deinit(self: *Self) void {
-        _ = self;
+        self.buttons.deinit();
     }
 
     pub fn update(self: *Self, ticks: u64) void {
@@ -869,6 +934,7 @@ pub const Game = struct {
         if (self.dev_mode and self.haathi.inputs.getKey(.t).is_clicked) self.intersection.deserialize(test_1);
         self.intersection.update(ticks, self.arena);
         self.updateMouse();
+        self.updateCompletions();
     }
 
     fn toggleDevMode(self: *Self) void {
@@ -877,9 +943,72 @@ pub const Game = struct {
         self.intersection.resetLevel();
     }
 
+    fn setupButtons(self: *Self) void {
+        {
+            const button_size = Vec2{ .x = 30, .y = 24 };
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{ .x = PANE_X + PANE_PADDING, .y = SCREEN_SIZE.y - (PANE_PADDING + button_size.y + 20) },
+                    .size = button_size,
+                },
+                .value = @intCast(u8, @intFromEnum(ButtonAction.prev_level)),
+                .text = "<",
+            }) catch unreachable;
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{ .x = SCREEN_SIZE.x - PANE_PADDING - button_size.x, .y = SCREEN_SIZE.y - (PANE_PADDING + button_size.y + 20) },
+                    .size = button_size,
+                },
+                .value = @intCast(u8, @intFromEnum(ButtonAction.next_level)),
+                .text = ">",
+            }) catch unreachable;
+        }
+        {
+            const button_size = Vec2{ .x = 100, .y = 24 };
+            const row_y = SCREEN_SIZE.y - (2 * (PANE_PADDING + button_size.y)) + 20 - PANE_PADDING;
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{
+                        .x = PANE_X + PANE_PADDING,
+                        .y = row_y,
+                    },
+                    .size = button_size,
+                },
+                .value = @intCast(u8, @intFromEnum(ButtonAction.clear_level)),
+                .text = "Clear",
+            }) catch unreachable;
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{
+                        .x = SCREEN_SIZE.x - button_size.x - PANE_PADDING,
+                        .y = row_y,
+                    },
+                    .size = button_size,
+                },
+                .value = @intCast(u8, @intFromEnum(ButtonAction.step_forward)),
+                .text = "Step",
+            }) catch unreachable;
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{
+                        .x = SCREEN_SIZE.x - (2 * (button_size.x + PANE_PADDING)),
+                        .y = row_y,
+                    },
+                    .size = button_size,
+                },
+                .value = @intCast(u8, @intFromEnum(ButtonAction.reset_level)),
+                .text = "Reset",
+            }) catch unreachable;
+        }
+    }
+
     fn setNextLevel(self: *Self) void {
         self.level_index = helpers.applyChangeLooped(self.level_index, 1, LEVELS.len - 1);
-        self.intersection.deserialize(LEVELS[self.level_index]);
+        self.intersection.deserialize(LEVELS[self.level_index].data);
+    }
+
+    fn updateCompletions(self: *Self) void {
+        if (self.intersection.cleared) self.levels_complete[self.level_index] = true;
     }
 
     fn updateMouse(self: *Self) void {
@@ -954,6 +1083,10 @@ pub const Game = struct {
             }
             return;
         }
+        for (self.buttons.items) |*button| button.update(self.haathi.inputs.mouse);
+        for (self.buttons.items) |button| {
+            if (button.clicked) self.performAction(@enumFromInt(ButtonAction, button.value));
+        }
         switch (self.state) {
             .idle => |_| {
                 self.state.idle.hovered_sensor = null;
@@ -1023,6 +1156,26 @@ pub const Game = struct {
                     self.state = .{ .idle = .{} };
                 }
             },
+        }
+    }
+
+    fn performAction(self: *Self, action: ButtonAction) void {
+        switch (action) {
+            .prev_level => {
+                if (self.level_index > 0) {
+                    self.level_index -= 1;
+                    self.intersection.deserialize(LEVELS[self.level_index].data);
+                }
+            },
+            .next_level => {
+                if (self.level_index < LEVELS.len - 1) {
+                    self.level_index += 1;
+                    self.intersection.deserialize(LEVELS[self.level_index].data);
+                }
+            },
+            .reset_level => self.intersection.resetLevel(),
+            .clear_level => self.intersection.clearConnections(),
+            .step_forward => self.intersection.step(),
         }
     }
 
@@ -1241,5 +1394,78 @@ pub const Game = struct {
             .size = .{ .x = PANE_WIDTH, .y = SCREEN_SIZE.y },
             .color = colors.solarized_base03,
         });
+        for (self.buttons.items) |button| {
+            if (button.hovered) {
+                self.haathi.drawRect(.{
+                    .position = button.rect.position.add(.{ .x = -4, .y = -4 }),
+                    .size = button.rect.size.add(.{ .x = 8, .y = 8 }),
+                    .color = colors.solarized_base1,
+                    .radius = 4 + 4,
+                });
+            }
+            if (button.triggered) {
+                self.haathi.drawRect(.{
+                    .position = button.rect.position.add(.{ .x = -4, .y = -4 }),
+                    .size = button.rect.size.add(.{ .x = 8, .y = 8 }),
+                    .color = colors.solarized_base2,
+                    .radius = 4 + 4,
+                });
+            }
+            self.haathi.drawRect(.{
+                .position = button.rect.position,
+                .size = button.rect.size,
+                .color = colors.solarized_base00,
+                .radius = 4,
+            });
+            self.haathi.drawText(.{
+                .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 6 }),
+                .text = button.text,
+                .style = FONT_1,
+                .color = colors.solarized_base03,
+            });
+        }
+        {
+            const lev_name = std.fmt.allocPrintZ(self.arena, "{d}: {s}", .{ self.level_index + 1, LEVELS[self.level_index].name }) catch unreachable;
+            self.haathi.drawText(.{
+                .text = lev_name,
+                .position = .{ .x = PANE_WIDTH / 2 + PANE_X, .y = SCREEN_SIZE.y - (PANE_PADDING * 2) + 4 },
+                .style = FONT_1,
+                .color = colors.solarized_base00,
+            });
+        }
+        // draw level completions
+        {
+            const indicator_size = Vec2{ .x = 30, .y = 24 };
+            const width = PANE_WIDTH - (PANE_PADDING * 2);
+            const padding = (width - (indicator_size.x * @floatFromInt(f32, LEVELS.len))) / @floatFromInt(f32, LEVELS.len - 1);
+            const start_x = PANE_X + PANE_PADDING;
+            const start_y = SCREEN_SIZE.y - PANE_PADDING - 8;
+            for (self.levels_complete, 0..) |lev, i| {
+                const fi = @floatFromInt(f32, i);
+                const x = start_x + (indicator_size.x * fi) + (padding * fi);
+                if (i == self.level_index) {
+                    self.haathi.drawRect(.{
+                        .position = (Vec2{ .x = x, .y = start_y }).add(.{ .x = -3, .y = -3 }),
+                        .size = indicator_size.add(.{ .x = 6, .y = 6 }),
+                        .color = colors.solarized_base1,
+                        .radius = 7,
+                    });
+                }
+                self.haathi.drawRect(.{
+                    .position = .{ .x = x, .y = start_y },
+                    .size = indicator_size,
+                    .color = colors.solarized_base00,
+                    .radius = 4,
+                });
+                if (lev) {
+                    self.haathi.drawRect(.{
+                        .position = (Vec2{ .x = x, .y = start_y }).add(.{ .x = 6, .y = 6 }),
+                        .size = indicator_size.add(.{ .x = -12, .y = -12 }),
+                        .color = colors.solarized_base02,
+                        .radius = 2,
+                    });
+                }
+            }
+        }
     }
 };
