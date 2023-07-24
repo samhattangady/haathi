@@ -5,12 +5,14 @@ pub fn build(b: *std.build.Builder) void {
     if (b.option(bool, "synthelligence", "Build Synthelligence Game")) |_| synth_builder(b);
     if (b.option(bool, "hiveminder", "Build Hiveminder Game")) |_| jam_game_builder(b, .hiveminder);
     if (b.option(bool, "drifter", "Build Drifter Game")) |_| jam_game_builder(b, .drifter);
+    if (b.option(bool, "juggler", "Build Juggler Game")) |_| jam_game_builder(b, .juggler);
 }
 
 pub const Game = enum {
     synthelligence,
     hiveminder,
     drifter,
+    juggler,
 };
 
 fn font_builder(b: *std.build.Builder) void {

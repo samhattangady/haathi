@@ -10,6 +10,7 @@ const Vec4 = helpers.Vec4;
 pub const SCREEN_HEIGHT = 720;
 pub const SCREEN_WIDTH = 1280;
 pub const SCREEN_SIZE = Vec2{ .x = SCREEN_WIDTH, .y = SCREEN_HEIGHT };
+pub const FONT_1 = "18px JetBrainsMono";
 
 pub const CursorStyle = enum {
     auto,
@@ -217,7 +218,7 @@ pub const DrawTextOptions = struct {
     text: []const u8,
     position: Vec2,
     color: Vec4,
-    style: []const u8,
+    style: []const u8 = FONT_1,
     width: f32 = 1280,
     alignment: TextAlignment = .center,
 };

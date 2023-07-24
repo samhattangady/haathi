@@ -571,3 +571,10 @@ the systems. So let's try to get that done =).
 24 Jul 2023:
 It's a new week again. I have an idea for a programming game about juggling.
 Let's see how that all plans out =D
+
+Okay. What's the first thing that we build for juggler? What are all the
+things that will be required first of all. Lets see if we can get a bit of a
+handle on taht one. Then we can see what's next.
+
+Okay, lets just get a basic cascade going. Lets do the programming studds a
+little later.

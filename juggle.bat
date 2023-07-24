@@ -12,7 +12,7 @@ if exist %library% (del %library%)
 if exist %out_wasm% (del %out_wasm%)
 if exist %out_html% (del %out_html%)
 if exist %out_js% (del %out_js%)
-call timecmd current_zig build -Ddrifter=true %*
+call timecmd current_zig build -Djuggler=true %*
 if exist %library% (move %library% %out_wasm%)
 copy %src_html% %out_html%
 copy %src_js% %out_js%
