@@ -565,3 +565,9 @@ Final day of the jam. Today, I would like to just focus on making levels. The
 only other thing that needs to be done is to add some kind of level select,
 and maybe the instructions. Beyond that, we have enough to thoroughly explore
 the systems. So let's try to get that done =).
+
+---
+
+24 Jul 2023:
+It's a new week again. I have an idea for a programming game about juggling.
+Let's see how that all plans out =D

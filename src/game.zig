@@ -4,18 +4,28 @@ const Haathi = @import("haathi.zig").Haathi;
 const colors = @import("colors.zig");
 const MouseState = @import("inputs.zig").MouseState;
 const SCREEN_SIZE = @import("haathi.zig").SCREEN_SIZE;
+const CursorStyle = @import("haathi.zig").CursorStyle;
 
 const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
 const Vec4 = helpers.Vec4;
 const Rect = helpers.Rect;
+const Button = helpers.Button;
 
 const FONT_1 = "18px JetBrainsMono";
+
+const StateData = union(enum) {
+    idle: struct {
+        index: ?usize = null,
+    },
+    idle_drag: void,
+};
 
 pub const Game = struct {
     const Self = @This();
     haathi: *Haathi,
     ticks: u64 = 0,
+    state: StateData = .{ .idle = .{} },
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -45,6 +55,10 @@ pub const Game = struct {
     }
 
     pub fn render(self: *Self) void {
-        _ = self;
+        self.haathi.drawRect(.{
+            .position = .{},
+            .size = SCREEN_SIZE,
+            .color = colors.solarized_base3,
+        });
     }
 };
