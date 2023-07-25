@@ -578,3 +578,27 @@ handle on taht one. Then we can see what's next.
 
 Okay, lets just get a basic cascade going. Lets do the programming studds a
 little later.
+
+---
+
+25 Jul 2023:
+Yeah not too bad yesterday ya. We got the simple 3ball cascade working fine.
+Today we should work on the interface and stuff.
+
+I think one question that we need to answer is how to handle catching. In the
+sense that we had thought of a system similar to opus mahnum. So the timing is
+fully in our control. Right now, as soon as the hand catches a ball, it will
+go on to the next strp, and in that case, we can't control the things in the
+same way. Though I guess we could just ask it to set an amount of time to be
+"ready", and within that time we catch. And once the time runs out, we move to
+the next step regardless of whether we have caught anything or not. That
+should be good.
+
+Another big question is how to set up the start position and things. But maybe
+that can be handled later.
+
+I think the first thing that I want to do is actually the trail...
+
+We need to rethink how we set up the interface. I don't think we should have
+one button for throw, and then edit its properties. I think we should set up
+everything first, and then add the block into the timeline.
