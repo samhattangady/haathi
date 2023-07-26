@@ -78,3 +78,7 @@ pub const endesga_grey6 = endesga_26;
 pub const endesga_blue0 = endesga_19;
 pub const endesga_blue1 = endesga_18;
 pub const endesga_blue2 = endesga_17;
+pub const endesga_orange0 = endesga_11;
+pub const endesga_orange1 = endesga_10;
+pub const endesga_yellow0 = endesga_12;
+pub const endesga_pink0 = endesga_30;

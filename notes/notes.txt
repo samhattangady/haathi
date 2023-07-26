@@ -602,3 +602,11 @@ I think the first thing that I want to do is actually the trail...
 We need to rethink how we set up the interface. I don't think we should have
 one button for throw, and then edit its properties. I think we should set up
 everything first, and then add the block into the timeline.
+
+---
+
+26 Jul 2023:
+We have a good idea for how to make the programming blocks. Lets get that done
+=D
+I think it migght need some amount of prepwork. The throw direction stuff is
+one, and just the arm positions...

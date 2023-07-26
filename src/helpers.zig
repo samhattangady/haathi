@@ -290,6 +290,11 @@ pub const Line = struct {
     }
 };
 
+pub const TextLine = struct {
+    text: []const u8,
+    position: Vec2,
+};
+
 pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
     // Bezier Blend as per StackOverflow : https://stackoverflow.com/a/25730573/5453127
     // t goes between 0 and 1.
@@ -351,22 +356,25 @@ pub fn lerpf(start: f32, end: f32, t: f32) f32 {
 
 /// When we have an index that we want to toggle through while looping, then we use this.
 pub fn applyChangeLooped(value: u8, change: i8, max: u8) u8 {
+    return applyChange(value, change, max, true);
+}
+
+/// When we have an index that we want to toggle through while looping, then we use this.
+pub fn applyChange(value: u8, change: i8, max: u8, loop: bool) u8 {
+    const max_return = if (loop) 0 else max;
+    const min_return = if (loop) max else 0;
     std.debug.assert(change == 1 or change == -1);
     if (change == 1) {
-        if (value == max) return 0;
+        if (value == max) return max_return;
         return value + 1;
     }
     if (change == -1) {
-        if (value == 0) return max;
+        if (value == 0) return min_return;
         return value - 1;
     }
     unreachable;
 }
 
-// /// given an enum, it gives the next value in the cycle, and loops if required
-// pub fn enumCycleLooped(val: anytype, change: i8) @TypeOf(val) {
-//
-// }
 pub fn lineSegmentsIntersect(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2) ?Vec2 {
     // sometimes it looks like single points are being passed in
     if (p1.equal(p2) and p2.equal(p3) and p3.equal(p4)) {
@@ -409,4 +417,13 @@ pub fn parseBool(token: []const u8) !bool {
     if (std.mem.eql(u8, token, "true")) return true;
     if (std.mem.eql(u8, token, "false")) return false;
     return error.ParseError;
+}
+
+/// given an enum, it gives the next value in the cycle, and loops if required
+pub fn enumChange(val: anytype, change: i8, loop: bool) @TypeOf(val) {
+    const T = @TypeOf(val);
+    const max = @typeInfo(T).Enum.fields.len - 1;
+    const index = @intFromEnum(val);
+    const new_index = applyChange(@intCast(u8, index), change, @intCast(u8, max), loop);
+    return @enumFromInt(T, new_index);
 }
