@@ -220,6 +220,16 @@ pub const Vec4 = struct {
         col.w = a;
         return col;
     }
+
+    // TODO (26 Jul 2023 sam): Do a hsv based lerp also
+    pub fn lerp(self: *const Vec4, other: Vec4, f: f32) Vec4 {
+        return .{
+            .x = lerpf(self.x, other.x, f),
+            .y = lerpf(self.y, other.y, f),
+            .z = lerpf(self.z, other.z, f),
+            .w = lerpf(self.w, other.w, f),
+        };
+    }
 };
 
 pub const Rect = struct {
@@ -248,6 +258,7 @@ pub const Button = struct {
     rect: Rect,
     value: u8,
     text: []const u8,
+    text2: []const u8 = "",
     // mouse is hovering over button
     hovered: bool = false,
     // the frame that mouse button was down in bounds

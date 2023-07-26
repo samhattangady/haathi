@@ -610,3 +610,17 @@ We have a good idea for how to make the programming blocks. Lets get that done
 =D
 I think it migght need some amount of prepwork. The throw direction stuff is
 one, and just the arm positions...
+
+Two hard things now. One is to convert ThrowParams into paths/vectors. Two is
+to convert blocks into code and add the extra stuff (waiting, timings etc.)
+
+Lets do the throwparams first.
+So I have start and end positions, and height, which is a yoffset. So I need
+to draw a parabola between these points. The thing I am worried about is the
+timing/spacing, but I think we can handle that with the lerp, and have the
+path be equispaced. But if the path is longer, then the lerp would be
+different. Or we could just make it simpler, and do trajectory calculations.
+I'd have to look those up, but might make everything a little simpler...
+
+Okay, so I have x0 and x1, and I have v1 also I guess. What I need is theta?
+Think I got it.

@@ -25,24 +25,26 @@ const HAND_MOVE_DURATION_TICKS = 270;
 const CATCH_RADIUS_SQR = 12 * 12;
 const TRAIL_SIZE = 24;
 const TRAIL_WIDTH = 10;
-const NUM_SLOTS_IN_TRACK = 128;
+const NUM_SLOTS_IN_TRACK = 64;
 const TRACK_BUTTONS_LEFT_WIDTH = 60;
 const TRACK_PADDING = 10;
 const TRACK_HEIGHT = 48;
 const TRACK_WIDTH = SCREEN_SIZE.x - TRACK_BUTTONS_LEFT_WIDTH - (3 * TRACK_PADDING);
 const SLOT_PADDING = 3;
 const SLOT_WIDTH = (TRACK_WIDTH - (SLOT_PADDING * (NUM_SLOTS_IN_TRACK + 1))) / NUM_SLOTS_IN_TRACK;
-const BLOCK_BUTTON_SIZE = Vec2{ .x = 100, .y = 30 };
-const BLOCK_BUTTON_X = SCREEN_SIZE.x - (BLOCK_BUTTON_SIZE.x * 3) - (TRACK_PADDING * 3);
-const BLOCK_BUTTON_Y = TRACK_PADDING;
-const PANE_WIDTH = (BLOCK_BUTTON_SIZE.x * 3) + (TRACK_PADDING * 2);
-const PANE_X = BLOCK_BUTTON_X;
-const PANE_Y = BLOCK_BUTTON_SIZE.y + (TRACK_PADDING * 2);
+const PANE_BUTTON_SIZE = Vec2{ .x = 100, .y = 30 };
+const PANE_BUTTON_X = SCREEN_SIZE.x - (PANE_BUTTON_SIZE.x * 3) - (TRACK_PADDING * 3);
+const PANE_BUTTON_Y = TRACK_PADDING;
+const PANE_WIDTH = (PANE_BUTTON_SIZE.x * 3) + (TRACK_PADDING * 2);
+const PANE_X = PANE_BUTTON_X;
+const PANE_Y = PANE_BUTTON_SIZE.y + (TRACK_PADDING * 2);
 const PANE_HEIGHT = TRACK_1_Y - TRACK_PADDING - PANE_Y;
 const TRACK_1_Y = SCREEN_SIZE.y - TRACK_PADDING - TRACK_HEIGHT - TRACK_PADDING - TRACK_HEIGHT;
-const DEFAULT_BLOCK_WIDTH_COUNT = 10;
+const DEFAULT_BLOCK_WIDTH_COUNT = 7;
 const DEFAULT_BLOCK_WIDTH = (DEFAULT_BLOCK_WIDTH_COUNT * SLOT_WIDTH) + ((DEFAULT_BLOCK_WIDTH_COUNT - 1) * SLOT_PADDING);
-const SLOT_OFFSET_AMOUNT = 50;
+const HAND_SLOT_OFFSET_AMOUNT = 50;
+const HEIGHT_OFFSET = 50;
+const BLOCK_BUTTON_SIZE = Vec2{ .x = 140, .y = 48 };
 
 const BallPath = struct {
     const Self = @This();
@@ -146,6 +148,21 @@ const InstructionType = enum {
             .move => "move",
         };
     }
+
+    pub fn color(self: *const Self) Vec4 {
+        return switch (self.*) {
+            .ready => colors.endesga_orange0.lerp(colors.endesga_grey0, 0.4),
+            .throw => colors.endesga_green0.lerp(colors.endesga_grey0, 0.4),
+            .move => colors.endesga_pink0.lerp(colors.endesga_grey0, 0.2),
+        };
+    }
+    pub fn textColor(self: *const Self) Vec4 {
+        return switch (self.*) {
+            .ready => colors.endesga_tan3,
+            .throw => colors.endesga_green2,
+            .move => colors.endesga_red2,
+        };
+    }
 };
 
 /// in means towards the body, out means away from the body.
@@ -158,7 +175,20 @@ const ThrowTarget = enum {
     up,
     out_1,
     out_2,
+    pub fn powerf(self: *const ThrowTarget) f32 {
+        return switch (self.*) {
+            .in_5 => 5,
+            .in_4 => 4,
+            .in_3 => 3,
+            .in_2 => 2,
+            .in_1 => 1,
+            .up => 0,
+            .out_1 => -1,
+            .out_2 => -2,
+        };
+    }
 };
+const NUM_THROW_TARGETS = @typeInfo(ThrowTarget).Enum.fields.len;
 
 const ThrowHeight = enum {
     height_1,
@@ -166,6 +196,16 @@ const ThrowHeight = enum {
     height_3,
     height_4,
     height_5,
+
+    pub fn power(self: *const ThrowHeight) u8 {
+        return switch (self.*) {
+            .height_1 => 1,
+            .height_2 => 2,
+            .height_3 => 3,
+            .height_4 => 4,
+            .height_5 => 5,
+        };
+    }
 };
 
 const ThrowParams = struct {
@@ -174,29 +214,45 @@ const ThrowParams = struct {
     height: ThrowHeight,
 
     pub fn vector(self: *const Self, side: HandSide) Vec2 {
+        // projectile motion. we have y (vertical comp of velocity) from height
+        // y = sqrt(2*H*g)
+        // x = (R*g) / y
         const dir: f32 = if (side == .left) -1 else 1;
-        _ = self;
-        return .{ .x = dir * 7, .y = -20 };
+        const max_height = @floatFromInt(f32, self.height.power()) * HEIGHT_OFFSET;
+        const range = self.target.powerf() * HAND_SLOT_OFFSET_AMOUNT;
+        const y = @sqrt(2 * max_height * GRAVITY) * -1;
+        const x = (range * GRAVITY) / (2 * @fabs(y));
+        return .{ .x = dir * x, .y = y };
+    }
+
+    pub fn text(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        return std.fmt.allocPrintZ(arena, "{s} h{d}", .{
+            @tagName(self.target),
+            self.height.power(),
+        }) catch unreachable;
     }
 };
 
 // TODO (24 Jul 2023 sam): add vertical positions as well?
 const HandPos = enum {
     const Self = @This();
-    out, // reverse cascade throw?
-    neutral, // cascade catch
-    in, // cascade throw
+    left_out, // reverse cascade throw?
+    left_neutral, // cascade catch
+    left_in, // cascade throw
     middle, // columns middle
-    across, // mills mess etc
+    right_in, // cascade throw
+    right_neutral, // cascade catch
+    right_out, // reverse cascade throw?
 
-    pub fn position(self: *const Self, side: HandSide) Vec2 {
-        const dir: f32 = if (side == .right) -1 else 1;
+    pub fn position(self: *const Self) Vec2 {
         return switch (self.*) {
-            .out => JUGGLER_CENTER.add(.{ .x = dir * 150 }),
-            .neutral => JUGGLER_CENTER.add(.{ .x = dir * 100 }),
-            .in => JUGGLER_CENTER.add(.{ .x = dir * 50 }),
+            .left_out => JUGGLER_CENTER.add(.{ .x = 3 * HAND_SLOT_OFFSET_AMOUNT }),
+            .left_neutral => JUGGLER_CENTER.add(.{ .x = 2 * HAND_SLOT_OFFSET_AMOUNT }),
+            .left_in => JUGGLER_CENTER.add(.{ .x = 1 * HAND_SLOT_OFFSET_AMOUNT }),
             .middle => JUGGLER_CENTER.add(.{}),
-            .across => JUGGLER_CENTER.add(.{ .x = dir * -50 }),
+            .right_out => JUGGLER_CENTER.add(.{ .x = -3 * HAND_SLOT_OFFSET_AMOUNT }),
+            .right_neutral => JUGGLER_CENTER.add(.{ .x = -2 * HAND_SLOT_OFFSET_AMOUNT }),
+            .right_in => JUGGLER_CENTER.add(.{ .x = -1 * HAND_SLOT_OFFSET_AMOUNT }),
         };
     }
 };
@@ -217,24 +273,46 @@ const Instruction = struct {
     instruction: InstructionParams,
     length: u16 = 20,
 
-    pub fn text(self: *const Self) []const u8 {
+    pub fn text(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        _ = arena;
         switch (self.instruction) {
-            .move => |params| {
-                return params.move.text();
+            .move => |_| {
+                return "move";
             },
-            .throw => |params| {
-                _ = params;
+            .throw => |_| {
                 return "throw";
             },
             .ready => return "catch",
         }
     }
+
+    pub fn text2(self: *const Self, arena: std.mem.Allocator) []const u8 {
+        switch (self.instruction) {
+            .move => |params| {
+                return params.move.text();
+            },
+            .throw => |params| {
+                return params.text(arena);
+            },
+            .ready => return "",
+        }
+    }
 };
 
 const Block = struct {
+    const Self = @This();
     instruction: Instruction,
     start_index: u8 = 0,
     width: u8 = 0,
+
+    pub fn color(self: *const Self) Vec4 {
+        const inst_type: InstructionType = self.instruction.instruction;
+        return inst_type.color();
+    }
+    pub fn textColor(self: *const Self) Vec4 {
+        const inst_type: InstructionType = self.instruction.instruction;
+        return inst_type.textColor();
+    }
 };
 
 const Track = struct {
@@ -273,6 +351,44 @@ const Track = struct {
             .width = DEFAULT_BLOCK_WIDTH_COUNT,
         };
         self.blocks.append(block) catch unreachable;
+    }
+
+    pub fn deleteBlock(self: *Self, index: usize) void {
+        if (index > self.blocks.items.len - 1) {
+            helpers.debugPrint("trying to delete index {d} when there are only {d} blocks", .{ index, self.blocks.items.len });
+            return;
+        }
+        _ = self.blocks.orderedRemove(index);
+    }
+
+    fn slotOccupied(self: *const Self, index: usize) bool {
+        for (self.blocks.items) |block| {
+            if (index >= block.start_index and index < block.start_index + block.width) return true;
+        }
+        return false;
+    }
+
+    pub fn getSlot(self: *const Self, pos: Vec2) struct {
+        not_allowed: bool,
+        index: ?usize,
+    } {
+        var na = false;
+        var index: ?usize = null;
+        for (self.slots.items, 0..) |slot, i| {
+            if (slot.contains(pos)) {
+                index = i;
+                break;
+            }
+        }
+        if (index) |i| {
+            if (self.slotOccupied(i)) {
+                na = true;
+                index = null;
+            }
+            return .{ .not_allowed = na, .index = index };
+        } else {
+            return .{ .not_allowed = false, .index = null };
+        }
     }
 };
 
@@ -336,8 +452,8 @@ const Hand = struct {
 
     pub fn init(side: HandSide, allocator: std.mem.Allocator) Self {
         const pos = switch (side) {
-            .right => HandPos.in.position(side),
-            .left => HandPos.in.position(side),
+            .right => HandPos.right_in.position(),
+            .left => HandPos.left_in.position(),
         };
         var self = Self{
             .side = side,
@@ -415,8 +531,8 @@ const Hand = struct {
         } }) catch unreachable;
         self.instructions.append(.{ .instruction = .{
             .throw = .{
-                .target = .in_1,
-                .height = .height_3,
+                .target = .in_3,
+                .height = .height_5,
             },
         } }) catch unreachable;
         self.instructions.append(.{ .instruction = .{
@@ -449,12 +565,12 @@ const Juggler = struct {
 
     fn setup(self: *Self) void {
         const throw = ThrowParams{
-            .height = .height_3,
-            .target = .in_1,
+            .height = .height_2,
+            .target = .in_3,
         };
         // ball 0 is midair, thrown by left
         self.balls.append(.{ .position = .{}, .path = BallPath.init(
-            HandPos.in.position(.left),
+            HandPos.left_in.position(),
             throw,
             .left,
         ) }) catch unreachable;
@@ -468,8 +584,8 @@ const Juggler = struct {
         self.hands[1].holding = 1;
         self.hands[0].state = .{ .moving = .{
             .move_start_ticks = 0,
-            .start_position = HandPos.neutral.position(.left),
-            .target_position = HandPos.in.position(.left),
+            .start_position = HandPos.left_neutral.position(),
+            .target_position = HandPos.left_in.position(),
         } };
         self.hands[0].inst_index = 0;
         self.hands[0].holding = 2;
@@ -509,14 +625,14 @@ const Movement = enum {
 
     pub fn text(self: *const Movement) []const u8 {
         return switch (self.*) {
-            .in_4 => "move in_4",
-            .in_2 => "move in_2",
-            .in_3 => "move in_3",
-            .in_1 => "move in_1",
-            .out_1 => "move out_1",
-            .out_2 => "move out_2",
-            .out_3 => "move out_3",
-            .out_4 => "move out_4",
+            .in_4 => "in_4",
+            .in_2 => "in_2",
+            .in_3 => "in_3",
+            .in_1 => "in_1",
+            .out_1 => "out_1",
+            .out_2 => "out_2",
+            .out_3 => "out_3",
+            .out_4 => "out_4",
         };
     }
 
@@ -548,7 +664,7 @@ const Movement = enum {
         const hand: f32 = if (side == .left) -1 else 1;
         const dir: f32 = if (self.in()) 1 else -1;
         const amount = @floatFromInt(f32, self.num_slots());
-        return .{ .x = dir * hand * amount * SLOT_OFFSET_AMOUNT };
+        return .{ .x = dir * hand * amount * HAND_SLOT_OFFSET_AMOUNT };
     }
 };
 
@@ -575,15 +691,14 @@ pub const Game = struct {
     state: StateData = .{ .idle = .{} },
     juggler: Juggler,
     program: Program,
-    path: BallPath = undefined,
+    paths: [NUM_THROW_TARGETS]BallPath = undefined,
     paused: bool = false,
     cursor: CursorStyle = .default,
     block: ?Block = null,
     active_pane: Pane = .code,
     hand_positions: [7]Vec2 = undefined,
     movement_amount: Movement = .in_1,
-    throw_target: ThrowTarget = .in_3,
-    throw_height: ThrowHeight = .height_3,
+    throw_params: ThrowParams = .{ .height = .height_3, .target = .in_3 },
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -616,40 +731,42 @@ pub const Game = struct {
     }
 
     pub fn setup(self: *Self) void {
-        const throw = ThrowParams{
-            .height = .height_3,
-            .target = .in_1,
-        };
-        self.path = BallPath.init(self.juggler.hands[0].position, throw, .left);
+        for (0..NUM_THROW_TARGETS) |i| {
+            const target = @enumFromInt(ThrowTarget, i);
+            const throw = ThrowParams{
+                .height = .height_5,
+                .target = target,
+            };
+            self.paths[i] = BallPath.init(JUGGLER_CENTER, throw, .left);
+        }
         for (0..@typeInfo(InstructionType).Enum.fields.len) |i| {
             const pane = @enumFromInt(Pane, i);
             const fi = @floatFromInt(f32, i);
             self.pane_buttons.append(.{
                 .rect = .{
                     .position = .{
-                        .x = BLOCK_BUTTON_X + (fi * (BLOCK_BUTTON_SIZE.x + TRACK_PADDING)),
-                        .y = BLOCK_BUTTON_Y,
+                        .x = PANE_BUTTON_X + (fi * (PANE_BUTTON_SIZE.x + TRACK_PADDING)),
+                        .y = PANE_BUTTON_Y,
                     },
-                    .size = BLOCK_BUTTON_SIZE,
+                    .size = PANE_BUTTON_SIZE,
                 },
                 .value = @intCast(u8, @intFromEnum(pane)),
                 .text = @tagName(pane),
             }) catch unreachable;
         }
-        self.hand_positions[0] = HandPos.out.position(.left);
-        self.hand_positions[1] = HandPos.neutral.position(.left);
-        self.hand_positions[2] = HandPos.in.position(.left);
-        self.hand_positions[3] = HandPos.middle.position(.left);
-        self.hand_positions[4] = HandPos.across.position(.left);
-        self.hand_positions[5] = HandPos.neutral.position(.right);
-        self.hand_positions[6] = HandPos.out.position(.right);
+        self.hand_positions[0] = HandPos.left_out.position();
+        self.hand_positions[1] = HandPos.left_neutral.position();
+        self.hand_positions[2] = HandPos.left_in.position();
+        self.hand_positions[3] = HandPos.middle.position();
+        self.hand_positions[4] = HandPos.right_in.position();
+        self.hand_positions[5] = HandPos.right_neutral.position();
+        self.hand_positions[6] = HandPos.right_out.position();
         {
             const center_pane_x = PANE_X + (PANE_WIDTH / 2);
             var y: f32 = PANE_Y + (TRACK_PADDING * 3);
             self.code_text.append(.{ .text = "move hand", .position = .{ .x = center_pane_x, .y = y } }) catch unreachable;
             y += 20;
-            const code_button_size = Vec2{ .x = 30, .y = 24 };
-            const block_button_size = Vec2{ .x = 140, .y = 24 };
+            const code_button_size = Vec2{ .x = 30, .y = 48 };
             self.code_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x - 100 - code_button_size.x, .y = y },
@@ -668,19 +785,19 @@ pub const Game = struct {
             }) catch unreachable;
             self.block_buttons.append(.{
                 .rect = .{
-                    .position = .{ .x = center_pane_x - (block_button_size.x / 2), .y = y },
-                    .size = block_button_size,
+                    .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
+                    .size = BLOCK_BUTTON_SIZE,
                 },
                 .value = @intCast(u8, @intFromEnum(InstructionType.move)),
                 .text = "move",
             }) catch unreachable;
-            y += 70;
+            y += 80;
             self.code_text.append(.{ .text = "throw ball", .position = .{ .x = center_pane_x, .y = y } }) catch unreachable;
             y += 20;
             self.code_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x - 100 - code_button_size.x, .y = y },
-                    .size = code_button_size,
+                    .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = "<",
                 .value = @intCast(u8, @intFromEnum(CodeButton.throw_in)),
@@ -688,43 +805,43 @@ pub const Game = struct {
             self.code_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x + 100, .y = y },
-                    .size = code_button_size,
+                    .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = ">",
                 .value = @intCast(u8, @intFromEnum(CodeButton.throw_out)),
             }) catch unreachable;
             self.block_buttons.append(.{
                 .rect = .{
-                    .position = .{ .x = center_pane_x - (block_button_size.x / 2), .y = y },
-                    .size = block_button_size.add(.{ .y = 30 }),
+                    .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
+                    .size = BLOCK_BUTTON_SIZE.add(.{ .y = 30 }),
                 },
                 .value = @intCast(u8, @intFromEnum(InstructionType.throw)),
                 .text = "throw",
             }) catch unreachable;
-            y += 30;
+            y += 42;
             self.code_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x - 100 - code_button_size.x, .y = y },
-                    .size = code_button_size,
+                    .size = code_button_size.add(.{ .y = -12 }),
                 },
-                .text = "^",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_in)),
+                .text = "v",
+                .value = @intCast(u8, @intFromEnum(CodeButton.throw_low)),
             }) catch unreachable;
             self.code_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x + 100, .y = y },
-                    .size = code_button_size,
+                    .size = code_button_size.add(.{ .y = -12 }),
                 },
-                .text = "v",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_out)),
+                .text = "^",
+                .value = @intCast(u8, @intFromEnum(CodeButton.throw_high)),
             }) catch unreachable;
-            y += 70;
+            y += 80;
             self.code_text.append(.{ .text = "catch ball", .position = .{ .x = center_pane_x, .y = y } }) catch unreachable;
             y += 20;
             self.block_buttons.append(.{
                 .rect = .{
-                    .position = .{ .x = center_pane_x - (block_button_size.x / 2), .y = y },
-                    .size = block_button_size,
+                    .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
+                    .size = BLOCK_BUTTON_SIZE,
                 },
                 .value = @intCast(u8, @intFromEnum(InstructionType.ready)),
                 .text = "catch",
@@ -754,17 +871,18 @@ pub const Game = struct {
     fn updateButtonText(self: *Self) void {
         // block0 - move
         // self.block_buttons.items[0].text = std.fmt.allocPrintZ(self.arena, "move {s}", .{@tagName(self.movement_amount)}) catch unreachable;
-        self.block_buttons.items[0].text = self.movement_amount.text();
+        self.block_buttons.items[0].text2 = self.movement_amount.text();
+        self.block_buttons.items[1].text2 = self.throw_params.text(self.arena);
     }
 
     fn triggerCodeButton(self: *Self, code: CodeButton) void {
         switch (code) {
             .move_in => self.movement_amount = helpers.enumChange(self.movement_amount, -1, false),
             .move_out => self.movement_amount = helpers.enumChange(self.movement_amount, 1, false),
-            .throw_in => self.throw_target = helpers.enumChange(self.throw_target, -1, false),
-            .throw_out => self.throw_target = helpers.enumChange(self.throw_target, 1, false),
-            .throw_high => self.throw_height = helpers.enumChange(self.throw_height, 1, false),
-            .throw_low => self.throw_height = helpers.enumChange(self.throw_height, -1, false),
+            .throw_in => self.throw_params.target = helpers.enumChange(self.throw_params.target, -1, false),
+            .throw_out => self.throw_params.target = helpers.enumChange(self.throw_params.target, 1, false),
+            .throw_high => self.throw_params.height = helpers.enumChange(self.throw_params.height, 1, false),
+            .throw_low => self.throw_params.height = helpers.enumChange(self.throw_params.height, -1, false),
         }
     }
 
@@ -832,10 +950,7 @@ pub const Game = struct {
                                 const throw_instruction =
                                     .{
                                     .instruction = .{
-                                        .throw = .{
-                                            .target = self.throw_target,
-                                            .height = self.throw_height,
-                                        },
+                                        .throw = self.throw_params,
                                     },
                                 };
                                 self.state = .{
@@ -857,12 +972,28 @@ pub const Game = struct {
                         }
                     }
                 }
+                if (mouse.r_button.is_clicked) {
+                    // delete block from track if we are hovering.
+                    delete_block: {
+                        for (&self.program.tracks) |*track| {
+                            for (track.blocks.items, 0..) |block, i| {
+                                const widthf = @floatFromInt(f32, block.width);
+                                const size = Vec2{ .x = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING), .y = TRACK_HEIGHT - SLOT_PADDING * 2 };
+                                const pos = track.slots.items[block.start_index].position;
+                                const rect = Rect{ .position = pos, .size = size };
+                                if (rect.contains(mouse.current_pos)) {
+                                    track.deleteBlock(i);
+                                    break :delete_block;
+                                }
+                            }
+                        }
+                    }
+                }
             },
             .idle_drag => {
                 if (mouse.l_button.is_released) self.state = .{ .idle = .{} };
             },
             .block_drag => |data| {
-                self.cursor = .grabbing;
                 self.state.block_drag.hovered_slot = null;
                 self.state.block_drag.hovered_track = null;
                 for (self.program.tracks, 0..) |track, i| {
@@ -870,11 +1001,11 @@ pub const Game = struct {
                 }
                 if (self.state.block_drag.hovered_track) |ti| {
                     const track = self.program.tracks[ti];
-                    for (track.slots.items, 0..) |slot, i| {
-                        if (slot.contains(mouse.current_pos)) {
-                            self.state.block_drag.hovered_slot = @intCast(u8, i);
-                            break;
-                        }
+                    const slot = track.getSlot(mouse.current_pos);
+                    if (slot.not_allowed) self.cursor = .no_drop;
+                    if (slot.index) |si| {
+                        self.state.block_drag.hovered_track = ti;
+                        self.state.block_drag.hovered_slot = @intCast(u8, si);
                     }
                 }
                 if (mouse.l_button.is_released) {
@@ -889,6 +1020,9 @@ pub const Game = struct {
             },
         }
     }
+
+    // fn renderBlockText(self: *Self, rect: Rect, block: Block) void {
+    // }
 
     pub fn render(self: *Self) void {
         self.haathi.setCursor(self.cursor);
@@ -916,11 +1050,17 @@ pub const Game = struct {
                 .radius = 3,
             });
         }
-        // self.haathi.drawPath(.{
-        //     .points = self.path.points[0..],
-        //     .color = colors.solarized_orange,
-        //     .width = 1,
-        // });
+        if (false) {
+            for (self.paths) |path| {
+                var points = self.arena.alloc(Vec2, NUM_BALL_PATH_POINTS) catch unreachable;
+                for (path.points, 0..) |pos, i| points[i] = pos;
+                self.haathi.drawPath(.{
+                    .points = points[0..],
+                    .color = colors.solarized_orange,
+                    .width = 1,
+                });
+            }
+        }
         for (self.juggler.balls.items) |ball| {
             // for (ball.trail.trail(self.arena)) |line| {
             //     self.haathi.drawPath(.{
@@ -966,12 +1106,22 @@ pub const Game = struct {
                 self.haathi.drawRect(.{
                     .position = pos,
                     .size = size,
-                    .color = colors.endesga_grey3,
+                    .color = block.color(),
+                });
+                //     self.haathi.drawText(.{
+                //         .position = pos.add(size.scale(0.5)).add(.{ .y = 6 }),
+                //         .color = block.textColor(),
+                //         .text = block.instruction.text(self.arena),
+                //     });
+                self.haathi.drawText(.{
+                    .position = pos.add(size.scale(0.5)).add(.{ .y = -6 }),
+                    .color = block.textColor(),
+                    .text = block.instruction.text(self.arena),
                 });
                 self.haathi.drawText(.{
-                    .position = pos.add(size.scale(0.5)).add(.{ .y = 6 }),
-                    .color = colors.endesga_grey0,
-                    .text = block.instruction.text(),
+                    .position = pos.add(size.scale(0.5)).add(.{ .y = 18 }),
+                    .color = block.textColor(),
+                    .text = block.instruction.text2(self.arena),
                 });
             }
         }
@@ -1034,13 +1184,18 @@ pub const Game = struct {
                 self.haathi.drawRect(.{
                     .position = button.rect.position,
                     .size = button.rect.size,
-                    .color = colors.endesga_pink0,
+                    .color = @enumFromInt(InstructionType, button.value).color(),
                     .radius = 2,
                 });
                 self.haathi.drawText(.{
-                    .position = button.rect.center().add(.{ .y = 6 }),
-                    .color = colors.endesga_grey0,
+                    .position = button.rect.center().add(.{ .y = -6 }),
+                    .color = @enumFromInt(InstructionType, button.value).textColor(),
                     .text = button.text,
+                });
+                self.haathi.drawText(.{
+                    .position = button.rect.center().add(.{ .y = 18 }),
+                    .color = @enumFromInt(InstructionType, button.value).textColor(),
+                    .text = button.text2,
                 });
             }
         }
@@ -1062,13 +1217,18 @@ pub const Game = struct {
             self.haathi.drawRect(.{
                 .position = pos,
                 .size = size,
-                .color = colors.endesga_grey3,
+                .color = block.color(),
                 .centered = centered,
             });
             self.haathi.drawText(.{
-                .position = pos.add(size.scale(scale)).add(.{ .y = 6 }),
-                .color = colors.endesga_grey0,
-                .text = block.instruction.text(),
+                .position = pos.add(size.scale(scale)).add(.{ .y = -6 }),
+                .color = block.textColor(),
+                .text = block.instruction.text(self.arena),
+            });
+            self.haathi.drawText(.{
+                .position = pos.add(size.scale(scale)).add(.{ .y = 18 }),
+                .color = block.textColor(),
+                .text = block.instruction.text2(self.arena),
             });
         }
     }
