@@ -624,3 +624,13 @@ I'd have to look those up, but might make everything a little simpler...
 
 Okay, so I have x0 and x1, and I have v1 also I guess. What I need is theta?
 Think I got it.
+
+For tomorrow: Convert the blocks to instructions. Also maybe remove catch?
+
+---
+
+27 Jul 2023:
+Cool we have the thing to start off working on. So lets just get to it. =)
+
+store hand starting positions, and ball starting positions in juggler. so that
+when we reset it all works correctly.
