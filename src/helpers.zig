@@ -371,7 +371,7 @@ pub fn applyChangeLooped(value: u8, change: i8, max: u8) u8 {
 }
 
 /// When we have an index that we want to toggle through while looping, then we use this.
-pub fn applyChange(value: u8, change: i8, max: u8, loop: bool) u8 {
+pub fn applyChange(value: anytype, change: anytype, max: anytype, loop: bool) @TypeOf(value) {
     const max_return = if (loop) 0 else max;
     const min_return = if (loop) max else 0;
     std.debug.assert(change == 1 or change == -1);

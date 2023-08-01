@@ -634,3 +634,31 @@ Cool we have the thing to start off working on. So lets just get to it. =)
 
 store hand starting positions, and ball starting positions in juggler. so that
 when we reset it all works correctly.
+
+---
+
+28 Jul 2023:
+Last day of this jam. But I really like this idea. Would like to see how I can
+develop this further.
+Anyway, I think that the first thing that we need to work on today should be
+the starting positions stuff. And other reset stuff.
+
+---
+
+31 Jul 2023:
+New jam today. The theme is everyday things.
+I have an idea about phone charging, and remaining in range of phone to always
+be ready to hear it ring.
+So it would be some kind off puzzle, where you move around the house, but you
+must always be in range of the phone (maybe direct line of sight), and you
+will also need your phone for certain purposes (like checking recipes /
+passwords etc.) and either have to carry the phone places or use other things
+to make notes...
+
+I think this is a kind of game that needs to be designed on paper first...
+Yeah and I am not particularly in the mood to do something like that right
+now. The other things that I can work on potentially is the engine itself. Add
+frames and scaling. We also need to add support for drawing sprites and
+playing sounds...
+
+Okay lets do the design thing.

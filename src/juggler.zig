@@ -25,7 +25,7 @@ const HAND_MOVE_DURATION_TICKS = 60;
 const CATCH_RADIUS_SQR = 12 * 12;
 const TRAIL_SIZE = 24;
 const TRAIL_WIDTH = 10;
-const NUM_SLOTS_IN_TRACK = 128;
+const NUM_SLOTS_IN_TRACK = 164;
 const TRACK_BUTTONS_LEFT_WIDTH = 60;
 const TRACK_PADDING = 10;
 const TRACK_HEIGHT = 48;
@@ -315,7 +315,7 @@ const Block = struct {
     const Self = @This();
     instruction: Instruction,
     start_index: usize = 0,
-    width: usize = 0,
+    width: usize = 10,
 
     pub fn color(self: *const Self) Vec4 {
         const inst_type: InstructionType = self.instruction.instruction;
@@ -329,6 +329,11 @@ const Block = struct {
         _ = ctx;
         return b0.start_index < b1.start_index;
     }
+};
+
+const SlotFit = struct {
+    not_allowed: bool,
+    index: ?usize,
 };
 
 const Track = struct {
@@ -383,17 +388,15 @@ const Track = struct {
         _ = self.blocks.orderedRemove(index);
     }
 
-    fn slotOccupied(self: *const Self, index: usize) bool {
+    fn slotOccupied(self: *const Self, index: usize, width: usize) bool {
         for (self.blocks.items) |block| {
             if (index >= block.start_index and index < block.start_index + block.width) return true;
+            if (index + width - 1 >= block.start_index and index + width - 1 < block.start_index + block.width) return true;
         }
         return false;
     }
 
-    pub fn getSlot(self: *const Self, pos: Vec2) struct {
-        not_allowed: bool,
-        index: ?usize,
-    } {
+    pub fn getSlot(self: *const Self, pos: Vec2, width: usize) SlotFit {
         var na = false;
         var index: ?usize = null;
         for (self.slots.items, 0..) |slot, i| {
@@ -403,7 +406,7 @@ const Track = struct {
             }
         }
         if (index) |i| {
-            if (self.slotOccupied(i)) {
+            if (self.slotOccupied(i, width)) {
                 na = true;
                 index = null;
             }
@@ -418,6 +421,7 @@ const Program = struct {
     const Self = @This();
     tracks: [2]Track,
     allocator: std.mem.Allocator,
+    synced: bool = true,
 
     pub fn init(allocator: std.mem.Allocator) Self {
         var self = Self{
@@ -441,8 +445,32 @@ const Program = struct {
         self.tracks[1].initSlots();
     }
 
-    pub fn addBlock(self: *Self, instruction: Instruction, track_index: u8, slot_index: u8) void {
+    pub fn addBlock(self: *Self, instruction: Instruction, track_index: usize, slot_index: u8) void {
+        if (self.synced and track_index == 1) return;
         self.tracks[track_index].addBlock(instruction, slot_index);
+        if (self.synced) self.tracks[1].addBlock(instruction, slot_index);
+    }
+
+    pub fn deleteBlock(self: *Self, track_index: usize, slot_index: u8) void {
+        if (self.synced and track_index == 1) return;
+        self.tracks[track_index].deleteBlock(slot_index);
+        if (self.synced) self.tracks[1].deleteBlock(slot_index);
+    }
+
+    pub fn getSlot(self: *Self, track_index: usize, pos: Vec2, width: usize) SlotFit {
+        if (self.synced and track_index == 1) return .{ .not_allowed = true, .index = null };
+        return self.tracks[track_index].getSlot(pos, width);
+    }
+
+    fn syncTracks(self: *Self) void {
+        self.tracks[1].blocks.clearRetainingCapacity();
+        for (self.tracks[0].blocks.items) |block| self.tracks[1].blocks.append(block) catch unreachable;
+    }
+
+    pub fn toggleSync(self: *Self) void {
+        const prev_synced = self.synced;
+        self.synced = !self.synced;
+        if (!prev_synced) self.syncTracks();
     }
 };
 
@@ -557,9 +585,7 @@ const Hand = struct {
         for (self.instructions.items) |inst| {
             if (inst.instruction == .loop) break;
             self.num_steps += inst.length;
-            helpers.debugPrint("{s} - {d}. total {d}", .{ @tagName(inst.instruction), inst.length, self.num_steps });
         }
-        helpers.debugPrint("{d} steps", .{self.num_steps});
     }
 
     pub fn holdBall(self: *Self, index: usize) void {
@@ -635,7 +661,6 @@ const Hand = struct {
         self.instructions.clearRetainingCapacity();
         var prev_block_end: usize = 0;
         for (blocks) |block| {
-            helpers.debugPrint("block start = {d}", .{block.start_index});
             if (block.start_index > prev_block_end) {
                 self.instructions.append(.{
                     .instruction = .ready,
@@ -654,46 +679,22 @@ const Hand = struct {
         self.setInstIndex(self.inst_index);
     }
 
-    fn setupCascadeInstructions(self: *Self) void {
-        self.instructions.append(.{
-            .instruction = .{
-                .move = .{
-                    .move = .in_1,
-                },
-            },
-            .length = 10,
-        }) catch unreachable;
-        self.instructions.append(.{
-            .instruction = .{
-                .throw = .{
-                    .target = .in_3,
-                    .height = .height_3,
-                },
-            },
-            .length = 10,
-        }) catch unreachable;
-        self.instructions.append(.{
-            .instruction = .{
-                .move = .{
-                    .move = .out_1,
-                },
-            },
-            .length = 10,
-        }) catch unreachable;
-        self.instructions.append(.{
-            .instruction = .ready,
-            .length = 40,
-        }) catch unreachable;
+    pub fn reset(self: *Self) void {
+        self.holding = null;
+        self.palming = [_]?usize{null} ** MAX_BALLS_PALM;
+        self.ticks = 0;
     }
 };
 
 const Juggler = struct {
     const Self = @This();
     hands: [2]Hand,
+    hand_pos: [2]HandPos = .{ .left_neutral, .right_neutral },
+    hand_offsets: [2]f32 = .{ 0, 0 },
+    num_balls_in_hand: [2]usize = .{ 0, 0 },
     balls: std.ArrayList(Ball),
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
-    right_hand_offset: f32 = 0,
     ticks: u64 = 0,
 
     pub fn init(allocator: std.mem.Allocator, arena: std.mem.Allocator) Self {
@@ -708,14 +709,15 @@ const Juggler = struct {
     }
 
     fn setup(self: *Self) void {
-        self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
-        self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
-        self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
-        self.hands[0].position = HandPos.left_neutral.position();
-        self.hands[1].position = HandPos.right_neutral.position();
-        self.hands[0].holdBall(0);
-        self.hands[0].holdBall(1);
-        self.hands[1].holdBall(2);
+        _ = self;
+        // self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
+        // self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
+        // self.balls.append(.{ .position = .{}, .path = null }) catch unreachable;
+        // self.hands[0].position = HandPos.left_neutral.position();
+        // self.hands[1].position = HandPos.right_neutral.position();
+        // self.hands[0].holdBall(0);
+        // self.hands[0].holdBall(1);
+        // self.hands[1].holdBall(2);
         // self.hands[0].setStepIndex(0);
         // self.hands[1].setStepIndex(20);
         //self.hands[0].incInstIndex();
@@ -728,9 +730,27 @@ const Juggler = struct {
         for (self.hands[0..]) |*hand| hand.update(dt, self);
     }
 
+    pub fn changeOffset(self: *Self, i: usize, change: i32) void {
+        self.hand_offsets[i] = helpers.applyChange(self.hand_offsets[i], -change, @floatFromInt(f32, self.hands[i].num_steps), false);
+        self.reset();
+    }
+
     fn reset(self: *Self) void {
-        self.hands[0].setStepIndex(0);
-        self.hands[1].setStepIndex(self.right_hand_offset);
+        self.hands[0].reset();
+        self.hands[1].reset();
+        self.hands[0].position = self.hand_pos[0].position();
+        self.hands[1].position = self.hand_pos[1].position();
+        self.hands[0].setStepIndex(self.hand_offsets[0]);
+        self.hands[1].setStepIndex(self.hand_offsets[1]);
+        self.balls.clearRetainingCapacity();
+        for (self.num_balls_in_hand, 0..) |num, hand_index| {
+            const pos = self.hands[hand_index].position;
+            for (0..num) |_| {
+                self.hands[hand_index].holdBall(self.balls.items.len);
+                self.balls.append(.{ .position = pos, .path = null }) catch unreachable;
+            }
+        }
+        self.ticks = 0;
     }
 };
 
@@ -804,6 +824,10 @@ const Movement = enum {
     }
 };
 
+const Command = enum {
+    toggle_sync,
+};
+
 const StateData = union(enum) {
     idle: struct {
         block_button_index: ?usize = null,
@@ -823,6 +847,7 @@ pub const Game = struct {
     pane_buttons: std.ArrayList(Button),
     code_buttons: std.ArrayList(Button),
     block_buttons: std.ArrayList(Button),
+    command_buttons: std.ArrayList(Button),
     code_text: std.ArrayList(TextLine),
     state: StateData = .{ .idle = .{} },
     juggler: Juggler,
@@ -851,6 +876,7 @@ pub const Game = struct {
             .pane_buttons = std.ArrayList(Button).init(allocator),
             .code_buttons = std.ArrayList(Button).init(allocator),
             .block_buttons = std.ArrayList(Button).init(allocator),
+            .command_buttons = std.ArrayList(Button).init(allocator),
             .code_text = std.ArrayList(TextLine).init(allocator),
             .allocator = allocator,
             .arena_handle = arena_handle,
@@ -902,6 +928,14 @@ pub const Game = struct {
         self.hand_positions[4] = HandPos.right_in.position();
         self.hand_positions[5] = HandPos.right_neutral.position();
         self.hand_positions[6] = HandPos.right_out.position();
+        self.command_buttons.append(.{
+            .rect = .{
+                .position = .{ .x = TRACK_PADDING, .y = SCREEN_SIZE.y - TRACK_PADDING - TRACK_HEIGHT },
+                .size = .{ .x = TRACK_BUTTONS_LEFT_WIDTH, .y = TRACK_HEIGHT },
+            },
+            .value = @intFromEnum(Command.toggle_sync),
+            .text = "sync",
+        }) catch unreachable;
         if (DEBUG_PRINTF) c.debugPrint("game setup 3");
         {
             const center_pane_x = PANE_X + (PANE_WIDTH / 2);
@@ -1031,13 +1065,22 @@ pub const Game = struct {
         self.program.addBlock(throw, 1, 10);
         self.program.addBlock(loop, 1, 70);
         self.loadProgram();
+        self.juggler.num_balls_in_hand = .{ 2, 1 };
+        self.juggler.hand_offsets[1] = 40;
+        self.juggler.reset();
+    }
+
+    pub fn addBlock(self: *Self, instruction: Instruction, track_index: u8, start_index: u8) void {
+        self.program.addBlock(instruction, track_index, start_index);
+        self.loadProgram();
     }
 
     pub fn loadProgram(self: *Self) void {
         self.juggler.hands[0].fromBlocks(self.program.tracks[0].blocks.items);
         self.juggler.hands[1].fromBlocks(self.program.tracks[1].blocks.items);
-        self.juggler.hands[0].setStepIndex(0);
-        self.juggler.hands[1].setStepIndex(40);
+        self.juggler.reset();
+        // self.juggler.hands[0].setStepIndex(0);
+        // self.juggler.hands[1].setStepIndex(40);
     }
 
     pub fn update(self: *Self, ticks: u64) void {
@@ -1059,6 +1102,10 @@ pub const Game = struct {
         for (self.pane_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.code_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.block_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
+        for (self.command_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
+        for (self.command_buttons.items) |button| {
+            if (button.clicked) self.doCommand(@enumFromInt(Command, button.value));
+        }
         self.updateMouse();
         self.updateButtonText();
     }
@@ -1077,6 +1124,13 @@ pub const Game = struct {
                 self.paused = true;
             }
         }
+    }
+
+    fn doCommand(self: *Self, command: Command) void {
+        switch (command) {
+            .toggle_sync => self.program.toggleSync(),
+        }
+        self.loadProgram();
     }
 
     fn updateButtonText(self: *Self) void {
@@ -1113,18 +1167,20 @@ pub const Game = struct {
                         break;
                     }
                 }
-                for (self.code_buttons.items) |*button| {
-                    if (button.contains(mouse.current_pos)) {
-                        active_code = button.value;
-                        self.cursor = .pointer;
-                        break;
+                if (self.active_pane == .code) {
+                    for (self.code_buttons.items) |*button| {
+                        if (button.contains(mouse.current_pos)) {
+                            active_code = button.value;
+                            self.cursor = .pointer;
+                            break;
+                        }
                     }
-                }
-                for (self.block_buttons.items, 0..) |*button, i| {
-                    if (button.contains(mouse.current_pos)) {
-                        self.state.idle.block_button_index = i;
-                        self.cursor = .grabbing;
-                        break;
+                    for (self.block_buttons.items, 0..) |*button, i| {
+                        if (button.contains(mouse.current_pos)) {
+                            self.state.idle.block_button_index = i;
+                            self.cursor = .grab;
+                            break;
+                        }
                     }
                 }
                 if (mouse.l_button.is_clicked) {
@@ -1140,6 +1196,7 @@ pub const Game = struct {
                     }
                     if (self.state.idle.block_button_index) |bbi| {
                         const inst = @enumFromInt(InstructionType, self.block_buttons.items[bbi].value);
+                        self.cursor = .grabbing;
                         switch (inst) {
                             .move => {
                                 const move_instruction =
@@ -1195,17 +1252,25 @@ pub const Game = struct {
                 if (mouse.r_button.is_clicked) {
                     // delete block from track if we are hovering.
                     delete_block: {
-                        for (&self.program.tracks) |*track| {
+                        for (&self.program.tracks, 0..) |*track, track_index| {
                             for (track.blocks.items, 0..) |block, i| {
                                 const widthf = @floatFromInt(f32, block.width);
                                 const size = Vec2{ .x = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING), .y = TRACK_HEIGHT - SLOT_PADDING * 2 };
                                 const pos = track.slots.items[block.start_index].position;
                                 const rect = Rect{ .position = pos, .size = size };
                                 if (rect.contains(mouse.current_pos)) {
-                                    track.deleteBlock(i);
+                                    self.program.deleteBlock(track_index, @intCast(u8, i));
+                                    self.loadProgram();
                                     break :delete_block;
                                 }
                             }
+                        }
+                    }
+                }
+                if (mouse.wheel_y != 0) {
+                    for (self.program.tracks, 0..) |track, i| {
+                        if (track.rect.contains(mouse.current_pos)) {
+                            self.juggler.changeOffset(i, mouse.wheel_y);
                         }
                     }
                 }
@@ -1220,8 +1285,7 @@ pub const Game = struct {
                     if (track.rect.contains(mouse.current_pos)) self.state.block_drag.hovered_track = @intCast(u8, i);
                 }
                 if (self.state.block_drag.hovered_track) |ti| {
-                    const track = self.program.tracks[ti];
-                    const slot = track.getSlot(mouse.current_pos);
+                    const slot = self.program.getSlot(ti, mouse.current_pos, self.block.?.width);
                     if (slot.not_allowed) self.cursor = .no_drop;
                     if (slot.index) |si| {
                         self.state.block_drag.hovered_track = ti;
@@ -1231,7 +1295,7 @@ pub const Game = struct {
                 if (mouse.l_button.is_released) {
                     if (self.state.block_drag.hovered_track) |ti| {
                         if (self.state.block_drag.hovered_slot) |si| {
-                            self.program.addBlock(data.instruction, ti, si);
+                            self.addBlock(data.instruction, ti, @intCast(u8, si));
                         }
                     }
                     self.block = null;
@@ -1253,7 +1317,7 @@ pub const Game = struct {
             .color = colors.endesga_grey1,
         });
         if (DEBUG_PRINTF2) c.debugPrint("game render 1");
-        for (self.program.tracks) |track| {
+        for (self.program.tracks, 0..) |track, track_index| {
             self.haathi.drawRect(.{
                 .position = track.rect.position,
                 .size = track.rect.size,
@@ -1289,6 +1353,13 @@ pub const Game = struct {
                     .position = pos.add(size.scale(0.5)).add(.{ .y = 18 }),
                     .color = block.textColor(),
                     .text = block.instruction.text2(self.arena),
+                });
+            }
+            if (track_index == 1 and self.program.synced) {
+                self.haathi.drawRect(.{
+                    .position = track.rect.position,
+                    .size = track.rect.size,
+                    .color = colors.endesga_grey2.alpha(0.5),
                 });
             }
         }
@@ -1354,7 +1425,7 @@ pub const Game = struct {
                         .color = colors.endesga_grey4,
                         .radius = 10,
                     });
-                    var inst_i = std.fmt.allocPrintZ(self.arena, "{d}:{d}", .{ hand.step_index, hand.inst_index }) catch unreachable;
+                    var inst_i = std.fmt.allocPrintZ(self.arena, "{d}", .{hand.step_index}) catch unreachable;
                     self.haathi.drawText(.{
                         .position = rect0.position.lerp(rect1.position, f).add(.{ .y = -6 }),
                         .text = inst_i,
@@ -1438,6 +1509,19 @@ pub const Game = struct {
                 .radius = 2,
             });
         }
+        for (self.command_buttons.items) |button| {
+            self.haathi.drawRect(.{
+                .position = button.rect.position,
+                .size = button.rect.size,
+                .color = if (self.program.synced) colors.endesga_grey3 else colors.endesga_grey3.alpha(0.3),
+                .radius = 2,
+            });
+            self.haathi.drawText(.{
+                .position = button.rect.center().add(.{ .y = 6 }),
+                .color = if (self.program.synced) colors.endesga_grey0 else colors.endesga_grey0.alpha(0.3),
+                .text = button.text,
+            });
+        }
         if (DEBUG_PRINTF2) c.debugPrint("game render 8");
         if (self.active_pane == .code) {
             for (self.code_text.items) |text| {
@@ -1489,9 +1573,17 @@ pub const Game = struct {
                 if (self.state.block_drag.hovered_track) |ti| {
                     if (self.state.block_drag.hovered_slot) |si| {
                         pos = self.program.tracks[ti].slots.items[si].position;
-                        size = Vec2{ .x = DEFAULT_BLOCK_WIDTH, .y = TRACK_HEIGHT - (2 * 3) };
+                        const widthf = @floatFromInt(f32, block.width);
+                        const block_width = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING);
+                        size = Vec2{ .x = block_width, .y = TRACK_HEIGHT - (2 * 3) };
                         centered = false;
                         scale = 0.5;
+                        const slot = std.fmt.allocPrintZ(self.arena, "{d}", .{si}) catch unreachable;
+                        self.haathi.drawText(.{
+                            .text = slot,
+                            .color = colors.endesga_grey4,
+                            .position = pos,
+                        });
                     }
                 }
             }
