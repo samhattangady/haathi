@@ -662,3 +662,39 @@ frames and scaling. We also need to add support for drawing sprites and
 playing sounds...
 
 Okay lets do the design thing.
+
+---
+
+07 Aug 2023:
+It's a new day and a new jam. I have the idea to make a game about holi.
+Basically, the high level concpet is that it is holi, and all the kids have
+holiday, but you work at a startup, and your boss has said that you need to
+report for work. So your job is to navigate through various alleys and avoid
+the kids. Something like a reversed tower defense.
+I like the idea that mechanically, the game is some kind of a card builder. So
+movement and everything is dictated by that. In all its more of avoidance,
+false triggerring, self shielding and things of that nature.
+One more thing that I want to add to that is scaling. Over the course of
+building a deck, I want there to be a few stratergies and synergies that the
+player can pursue. I dont really know what that would be though... Maybe one
+built around movement, one around defense, one around hiding, and things along
+those lines.
+In the ideation and things we need to figure out how the cards would need to
+be designed to facilitate that kind of scaling. Cool, but first we need to get
+some of the basic things set up I think,
+
+Okay, so then now we have to figure out what is the first thing that we start
+off with. Lets make a grid. Pkay, now we set up all the things to make it work
+on this system... Now we need to actually start working...
+
+One more question that we need to spend some time thinking about is whether we
+want it to be more tower defense style or whether we want it to be more
+tactical... Considering that we have just the one controllable character, both
+of those things would probably be the same...
+
+Other ideas for cards:
+route optimisation - rather than using the full height, you can reduce that by
+a few.
+
+Okay, we have the basic stuff of path generation complete. I think we should
+also have the movement done. Lets see that.
