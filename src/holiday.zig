@@ -29,26 +29,145 @@ const StateData = union(enum) {
     idle_drag: void,
 };
 
-const Direction = enum {
-    up,
-    down,
-    right,
-};
-
-const Cell = struct {
+const Pin = struct {
+    const Self = @This();
+    position: Vec2 = undefined,
+    size: f32 = 20,
+    // x is the col, y is the row
+    // in one row, x is either all even or odd
+    // first pin is at 0, 0
+    // second row is -1,1 and 1,1
+    // third row is -2,2, 0,2 and 2,2
+    // and so on.
     address: Vec2i,
-    position: Vec2,
-    size: f32,
+    fallen: bool = false,
+
+    pub fn init(address: Vec2i, num_rows: usize) Self {
+        var self = Self{.address=address};
+        self.setPosition(num_rows);
+        return self;
+    }
+
+    pub fn setPosition(self: *Self, num_rows: usize) void {
+        _ = num_rows; // TODO (08 Aug 2023): Use for scaling.
+        const spacing = 60; // pins are placed in equilateral triangles.
+        const x_padding = spacing * 0.5;
+        const y_padding = spacing * @cos(std.math.pi / 6.0);
+        const origin = SCREEN_SIZE.scale(0.5);
+        self.position.x = origin.x + (x_padding * @floatFromInt(f32, self.address.x));
+        self.position.y = origin.y - (y_padding * @floatFromInt(f32, self.address.y));
+    }
 };
 
-const PathCell = struct {
+const Dropper = struct {
+    target: Vec2i,
+    index: ?usize,
+    direction: Vec2i,
+};
+
+const PinDrop = struct {
     index: usize,
-    direction: Direction,
+    // if prev is null, then pin was dropped by ball
+    prev: ?usize,
+    gen: usize,
 };
 
-const Player = struct {
-    position: Vec2 = .{},
-    path_index: usize = 0,
+const Ball= struct {
+    position: Vec2,
+    address: Vec2i,
+    direction: Vec2i,
+};
+
+const Phalanx = struct {
+    const Self = @This();
+    pins: std.ArrayList(Pin),
+    drops: std.ArrayList(PinDrop),
+    queue: std.ArrayList(Dropper),
+    ticks: u64 = 0,
+    sim_generation: usize = 0,
+    ball: Ball= undefined,
+    allocator: std.mem.Allocator,
+
+    pub fn init(allocator: std.mem.Allocator) Self {
+        var self = Self{
+            .pins = std.ArrayList(Pin).init(allocator),
+            .drops = std.ArrayList(PinDrop).init(allocator),
+            .queue = std.ArrayList(Dropper).init(allocator),
+            .allocator = allocator,
+        };
+        self.setup();
+        return self;
+    }
+
+    fn setup(self: *Self) void {
+        // setup 4 rows.
+        const addresses = [_]Vec2i{
+            .{.x=0, .y=0},
+            .{.x=-1, .y=1}, .{.x=1, .y=1},
+            .{.x=-2, .y=2}, .{.x=0, .y=2}, .{.x=2, .y=2},
+            .{.x=-3, .y=3}, .{.x=-1, .y=3}, .{.x=1, .y=3}, .{.x=3, .y=3},
+            .{.x=-4, .y=4}, .{.x=-2, .y=4}, .{.x=0, .y=4}, .{.x=2, .y=4}, .{.x=4, .y=4}
+    };
+        for (addresses) |adr| {
+            const pin = Pin.init(adr, 4);
+            self.pins.append(pin) catch unreachable;
+        }
+    }
+
+    fn throwBall(self: *Self) void {
+        self.ball = .{
+            .address = .{},
+            .direction = .{.x=-1, .y=1},
+            .position = SCREEN_SIZE.scale(0.5).add(.{.y=100}),
+        };
+        self.setBallPosition();
+        self.sim_generation = 0;
+        self.queue.clearRetainingCapacity();
+    }
+
+    fn setBallPosition(self: *Self) void {
+        const pin = Pin.init(self.ball.address, 4);
+        self.ball.position = pin.position.add(.{.x=@floatFromInt(f32, self.ball.direction.x) * -25, .y = 25});
+    }
+
+    fn simulationStep(self: *Self) void {
+        const len = self.queue.items.len;
+        for (0..len) |_| {
+            const drop = self.queue.orderedRemove(0);
+            if (self.standingPinAt(drop.target)) |pin_index| {
+                self.pins.items[pin_index].fallen = true;
+                const fall = PinDrop{.index=pin_index, .prev=drop.index, .gen=self.sim_generation};
+                self.drops.append(fall) catch unreachable;
+                self.queue.append(.{
+                    .target=drop.target.add(drop.direction),
+                    .index=pin_index,
+                    .direction = drop.direction,
+                }) catch unreachable;
+            }
+        }
+        if (self.standingPinAt(self.ball.address)) |pin_index| {
+                self.pins.items[pin_index].fallen = true;
+                const fall = PinDrop{.index=pin_index, .prev=null, .gen=self.sim_generation};
+                self.drops.append(fall) catch unreachable;
+                self.queue.append(.{
+                    .target=self.ball.address.add(self.ball.direction),
+                    .index=pin_index,
+                    .direction = self.ball.direction,
+                }) catch unreachable;
+            self.ball.direction.x *= -1;
+            }
+        self.sim_generation+=1;
+        self.ball.address = self.ball.address.add(self.ball.direction);
+        self.setBallPosition();
+    }
+
+    fn standingPinAt(self: *Self, address: Vec2i) ?usize {
+        for (self.pins.items, 0..) |pin, i| {
+            if (pin.fallen) continue;
+            if (pin.address.equal(address)) return i;
+        }
+        return null;
+    }
 };
 
 pub const Game = struct {
@@ -56,9 +175,7 @@ pub const Game = struct {
     haathi: *Haathi,
     ticks: u64 = 0,
     state: StateData = .{ .idle = .{} },
-    grid: std.ArrayList(Cell),
-    path: std.ArrayList(PathCell),
-    player: Player = .{},
+    phalanx: Phalanx,
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -69,8 +186,7 @@ pub const Game = struct {
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         var self = Self{
             .haathi = haathi,
-            .grid = std.ArrayList(Cell).init(allocator),
-            .path = std.ArrayList(PathCell).init(allocator),
+            .phalanx = Phalanx.init(allocator),
             .allocator = allocator,
             .arena_handle = arena_handle,
             .arena = arena_handle.allocator(),
@@ -84,73 +200,7 @@ pub const Game = struct {
     }
 
     fn setup(self: *Self) void {
-        const x_padding = (GRID_WIDTH - (CELL_SIZE * NUM_COLS)) / (NUM_COLS + 1);
-        const y_padding = (GRID_HEIGHT - (CELL_SIZE * NUM_ROWS)) / (NUM_ROWS + 1);
-        for (0..NUM_ROWS) |y| {
-            for (0..NUM_COLS) |x| {
-                const xf = @floatFromInt(f32, x);
-                const yf = @floatFromInt(f32, y);
-                const cell = Cell{
-                    .address = .{ .x = @intCast(i32, x), .y = @intCast(i32, y) },
-                    .position = .{
-                        .x = (CELL_SIZE * xf) + (x_padding * (xf + 1)),
-                        .y = (CELL_SIZE * yf) + (y_padding * (yf + 1)),
-                    },
-                    .size = CELL_SIZE,
-                };
-                self.grid.append(cell) catch unreachable;
-            }
-        }
-    }
-
-    fn createPath(self: *Self) void {
-        self.path.clearRetainingCapacity();
-        // there are 3 cuts that we will be having to take.
-        // we first want to generate those.
-        if (DEBUG_PRINT_1) c.debugPrint("createPath 0");
-        var rng = std.rand.DefaultPrng.init(self.ticks);
-        var cuts = [5]usize{ 0, 0, 0, 0, NUM_COLS - 1 };
-        cuts[1] = 2 + rng.random().uintLessThan(usize, NUM_COLS - 8);
-        cuts[2] = cuts[1] + 2 + rng.random().uintLessThan(usize, NUM_COLS - 6 - cuts[1]);
-        cuts[3] = cuts[2] + 2 + rng.random().uintLessThan(usize, NUM_COLS - 4 - cuts[2]);
-        if (DEBUG_PRINT_1) helpers.debugPrint("createPath 1 cols = {d},{d},{d},{d},{d}", .{ cuts[0], cuts[1], cuts[2], cuts[3], cuts[4] });
-        var down = true;
-        for (cuts, 0..) |col, i| {
-            if (DEBUG_PRINT_1) helpers.debugPrint("createPath 2 col{d}", .{col});
-            // add path cells along col
-            for (0..NUM_ROWS-1) |r| {
-                const row = if (down) r else NUM_ROWS - r - 1;
-                const index = (row * NUM_COLS) + col;
-                const dir: Direction = if (down) .down else .up;
-                self.path.append(.{
-                    .index = index,
-                    .direction = dir,
-                }) catch unreachable;
-            }
-            if (col == NUM_COLS - 1) {
-                self.path.append(.{
-                    .index = self.grid.items.len-1,
-                    .direction = .down,
-                }) catch unreachable;
-                break;
-            }
-            // add path cells between cols
-            const row: usize = if (down) NUM_ROWS - 1 else 0;
-            if (DEBUG_PRINT_1) helpers.debugPrint("createPath 3 col{d}", .{col});
-            for (col..cuts[i + 1]) |col_i| {
-                const index = (row * NUM_COLS) + col_i;
-                self.path.append(.{
-                    .index = index,
-                    .direction = .right,
-                }) catch unreachable;
-            }
-            down = !down;
-        }
-    }
-
-    fn movePlayer(self: *Self) void {
-        self.player.path_index += 1;
-        if (self.player.path_index < self.path.items.len) self.player.position = self.grid.items[self.path.items[self.player.path_index].index].position;
+        self.phalanx.throwBall();
     }
 
     pub fn update(self: *Self, ticks: u64) void {
@@ -159,8 +209,7 @@ pub const Game = struct {
         self.arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         self.arena = self.arena_handle.allocator();
         self.ticks = ticks;
-        if (self.haathi.inputs.getKey(.space).is_clicked) self.createPath();
-        if (self.haathi.inputs.getKey(.s).is_clicked) self.movePlayer();
+        if (self.haathi.inputs.getKey(.space).is_clicked) self.phalanx.simulationStep();
     }
 
     pub fn render(self: *Self) void {
@@ -169,59 +218,30 @@ pub const Game = struct {
             .size = SCREEN_SIZE,
             .color = colors.endesga_grey1,
         });
-        self.haathi.drawRect(.{
-            .position = self.haathi.inputs.mouse.current_pos,
-            .size = .{ .x = 5, .y = 5 },
-            .color = colors.endesga_grey2,
-            .centered = true,
-            .radius = 5,
-        });
-        for (self.grid.items) |cell| {
+        for (self.phalanx.pins.items) |pin| {
             self.haathi.drawRect(.{
-                .position = cell.position,
-                .size = .{ .x = cell.size, .y = cell.size },
-                .color = colors.endesga_grey2.alpha(0.2),
-                .radius = 3,
+                .position = pin.position,
+                .size = .{ .x = pin.size, .y = pin.size },
+                .color = colors.endesga_grey2,
+                .centered = true,
+                .radius = pin.size,
             });
-        }
-        for (self.path.items) |path| {
-            const cell = self.grid.items[path.index];
-            self.haathi.drawRect(.{
-                .position = cell.position,
-                .size = .{ .x = cell.size, .y = cell.size },
-                .color = colors.endesga_grey3,
-                .radius = 3,
-            });
-            switch (path.direction) {
-                .up => {
-                    self.haathi.drawRect(.{
-                        .position = cell.position.add(.{ .y = -cell.size / 2 }),
-                        .size = .{ .x = cell.size, .y = cell.size },
-                        .color = colors.endesga_grey3,
-                    });
-                },
-                .down => {
-                    self.haathi.drawRect(.{
-                        .position = cell.position.add(.{ .y = cell.size / 2 }),
-                        .size = .{ .x = cell.size, .y = cell.size },
-                        .color = colors.endesga_grey3,
-                    });
-                },
-                .right => {
-                    self.haathi.drawRect(.{
-                        .position = cell.position.add(.{ .x = cell.size / 2 }),
-                        .size = .{ .x = cell.size, .y = cell.size },
-                        .color = colors.endesga_grey3,
-                    });
-                },
+            if (pin.fallen) {
+                self.haathi.drawRect(.{
+                    .position = pin.position,
+                    .size = .{ .x = pin.size, .y = pin.size },
+                    .color = colors.endesga_grey4,
+                    .centered = true,
+                    .radius = pin.size,
+                });
             }
         }
             self.haathi.drawRect(.{
-                .position = self.player.position.add(.{.x=CELL_SIZE/2, .y=CELL_SIZE/2}),
-                .size = .{ .x = 20, .y = 20 },
-                .color = colors.endesga_grey4,
-                .radius = 3,
-                .centered=true,
+                .position = self.phalanx.ball.position,
+                .size = .{ .x = 50, .y = 50},
+                .color = colors.endesga_blue2,
+                .centered = true,
+                .radius = 50,
             });
     }
 };
