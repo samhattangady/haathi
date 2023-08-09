@@ -101,7 +101,23 @@ const Phalanx = struct {
 
     fn setup(self: *Self) void {
         // setup 4 rows.
-        const addresses = [_]Vec2i{ .{ .x = 0, .y = 0 }, .{ .x = -1, .y = 1 }, .{ .x = 1, .y = 1 }, .{ .x = -2, .y = 2 }, .{ .x = 0, .y = 2 }, .{ .x = 2, .y = 2 }, .{ .x = -3, .y = 3 }, .{ .x = -1, .y = 3 }, .{ .x = 1, .y = 3 }, .{ .x = 3, .y = 3 }, .{ .x = -4, .y = 4 }, .{ .x = -2, .y = 4 }, .{ .x = 0, .y = 4 }, .{ .x = 2, .y = 4 }, .{ .x = 4, .y = 4 } };
+        const addresses = [_]Vec2i{
+            .{ .x = 0, .y = 0 },
+            .{ .x = -1, .y = 1 },
+            .{ .x = 1, .y = 1 },
+            .{ .x = -2, .y = 2 },
+            .{ .x = 0, .y = 2 },
+            .{ .x = 2, .y = 2 },
+            .{ .x = -3, .y = 3 },
+            .{ .x = -1, .y = 3 },
+            .{ .x = 1, .y = 3 },
+            .{ .x = 3, .y = 3 },
+            .{ .x = -4, .y = 4 },
+            .{ .x = -2, .y = 4 },
+            .{ .x = 0, .y = 4 },
+            .{ .x = 2, .y = 4 },
+            .{ .x = 4, .y = 4 },
+        };
         for (addresses) |adr| {
             const pin = Pin.init(adr, 4);
             self.pins.append(pin) catch unreachable;

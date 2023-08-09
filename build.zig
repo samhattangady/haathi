@@ -29,8 +29,11 @@ fn font_builder(b: *std.build.Builder) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    exe.addSystemIncludePath("dependencies/stb");
-    exe.addCSourceFile("dependencies/defines.c", &[_][]const u8{"-std=c99"});
+    exe.addSystemIncludePath(std.build.LazyPath.relative("dependencies/stb"));
+    exe.addCSourceFile(.{
+        .file = std.build.LazyPath.relative("dependencies/defines.c"),
+        .flags = &[_][]const u8{"-std=c99"},
+    });
     b.installArtifact(exe);
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
@@ -53,7 +56,7 @@ fn synth_builder(b: *std.build.Builder) void {
         .optimize = optimize,
     });
     exe.addOptions("build_options", options);
-    exe.addSystemIncludePath("src");
+    exe.addSystemIncludePath(std.build.LazyPath.relative("src"));
     exe.rdynamic = true;
     // b.default_step.dependOn(&exe.step);
     b.installArtifact(exe);
@@ -71,7 +74,7 @@ fn jam_game_builder(b: *std.build.Builder, game: Game) void {
         .optimize = optimize,
     });
     exe.addOptions("build_options", options);
-    exe.addSystemIncludePath("src");
+    exe.addSystemIncludePath(std.build.LazyPath.relative("src"));
     exe.rdynamic = true;
     // b.default_step.dependOn(&exe.step);
     b.installArtifact(exe);
