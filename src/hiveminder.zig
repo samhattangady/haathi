@@ -222,7 +222,7 @@ pub const Cell = struct {
     /// returns the center of the cell
     pub fn addressToPos(address: Address) Vec2 {
         const origin = HIVE_ORIGIN;
-        const center = origin.add(.{ .x = (HEX_SCALE + (HEX_SCALE * HEX_OFFSETS[5].x - HEX_OFFSETS[4].x)) * @floatFromInt(f32, address.x), .y = (HEX_SCALE * HEX_OFFSETS[5].y) * @floatFromInt(f32, address.y) });
+        const center = origin.add(.{ .x = (HEX_SCALE + (HEX_SCALE * HEX_OFFSETS[5].x - HEX_OFFSETS[4].x)) * @as(f32, @floatFromInt(address.x)), .y = (HEX_SCALE * HEX_OFFSETS[5].y) * @as(f32, @floatFromInt(address.y)) });
         return center;
     }
 
@@ -370,7 +370,7 @@ pub const Room = struct {
                     self.slots_signals[i] = true;
                     return Signal{
                         .signal = .collection_bee_required,
-                        .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
+                        .room = .{ .address = self.address, .slot_index = @as(u8, @intCast(i)) },
                         .waypoint = .{ .address = POLLEN_WAYPOINT, .slot_index = 0 },
                         .destination = signal.room,
                     };
@@ -385,7 +385,7 @@ pub const Room = struct {
                     return Signal{
                         .signal = .building_bee_required,
                         // room is building room
-                        .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
+                        .room = .{ .address = self.address, .slot_index = @as(u8, @intCast(i)) },
                         .waypoint = undefined,
                         // room to be built
                         .destination = signal.room,
@@ -418,7 +418,7 @@ pub const Room = struct {
                         return Signal{
                             .signal = .babysitting_food_required,
                             // room is the babysitting
-                            .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
+                            .room = .{ .address = self.address, .slot_index = @as(u8, @intCast(i)) },
                             // waypoint is the location of the food
                             .waypoint = signal.waypoint,
                             // destination is incubator
@@ -430,7 +430,7 @@ pub const Room = struct {
                         return Signal{
                             .signal = .babysitting_egg_required,
                             // room is the babysitting
-                            .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
+                            .room = .{ .address = self.address, .slot_index = @as(u8, @intCast(i)) },
                             // waypoint is the location of the egg
                             .waypoint = signal.waypoint,
                             // destination is incubator
@@ -442,7 +442,7 @@ pub const Room = struct {
                         return Signal{
                             .signal = .babysitting_attention_required,
                             // room is the babysitting
-                            .room = .{ .address = self.address, .slot_index = @intCast(u8, i) },
+                            .room = .{ .address = self.address, .slot_index = @as(u8, @intCast(i)) },
                             // waypoint is undefined
                             .waypoint = undefined,
                             // destination is incubator
@@ -866,9 +866,9 @@ pub const Hive = struct {
 
     // HIVEUPDATE
     pub fn update(self: *Self, raw_delta_t: u64, arena: std.mem.Allocator) void {
-        const delta_t = @intFromFloat(u64, (@floatFromInt(f32, raw_delta_t) * self.speed_up));
+        const delta_t = @as(u64, @intFromFloat((@as(f32, @floatFromInt(raw_delta_t)) * self.speed_up)));
         self.ticks += delta_t;
-        const f_delta_t = @floatFromInt(f32, delta_t);
+        const f_delta_t = @as(f32, @floatFromInt(delta_t));
         self.arena = arena;
         if (PRINT_F_DEBUG) c.debugPrint("hive_update_0");
         // iterate through all bees. move them if required. check if job is complete
@@ -948,7 +948,7 @@ pub const Hive = struct {
                         .signal = .room_construction_required,
                         .room = .{
                             .address = room.address,
-                            .slot_index = @intCast(u8, i),
+                            .slot_index = @as(u8, @intCast(i)),
                         },
                         .waypoint = undefined,
                         .destination = undefined,
@@ -969,7 +969,7 @@ pub const Hive = struct {
                                 .signal = .storage_space_available,
                                 .room = .{
                                     .address = room.address,
-                                    .slot_index = @intCast(u8, i),
+                                    .slot_index = @as(u8, @intCast(i)),
                                 },
                                 .waypoint = undefined,
                                 .destination = undefined,
@@ -982,7 +982,7 @@ pub const Hive = struct {
                                 .signal = .storage_food_available,
                                 .room = .{
                                     .address = room.address,
-                                    .slot_index = @intCast(u8, i),
+                                    .slot_index = @as(u8, @intCast(i)),
                                 },
                                 .waypoint = undefined,
                                 .destination = undefined,
@@ -1000,7 +1000,7 @@ pub const Hive = struct {
                                 .signal = .rest_slot_available,
                                 .room = .{
                                     .address = room.address,
-                                    .slot_index = @intCast(u8, i),
+                                    .slot_index = @as(u8, @intCast(i)),
                                 },
                                 .waypoint = undefined,
                                 .destination = undefined,
@@ -1057,7 +1057,7 @@ pub const Hive = struct {
                                             .signal = .maintenance_bee_required,
                                             .room = .{
                                                 .address = room.address,
-                                                .slot_index = @intCast(u8, i),
+                                                .slot_index = @as(u8, @intCast(i)),
                                             },
                                             .waypoint = undefined,
                                             .destination = .{
@@ -1557,7 +1557,7 @@ pub const Game = struct {
         }
         for (self.controls.items) |control| {
             if (control.clicked) {
-                self.play_state = @enumFromInt(PlayState, control.value);
+                self.play_state = @as(PlayState, @enumFromInt(control.value));
                 if (self.play_state == .reset) {
                     self.hive.reset();
                     self.play_state = .pause;
@@ -1613,7 +1613,7 @@ pub const Game = struct {
             if (i > 1) {
                 position = slots[i - 2];
             }
-            const button = CellButton.init(position, @intCast(u8, i));
+            const button = CellButton.init(position, @as(u8, @intCast(i)));
             self.buttons.append(button) catch unreachable;
         }
     }
@@ -1621,8 +1621,8 @@ pub const Game = struct {
     fn setupControls(self: *Self) void {
         const button_width: f32 = (HIVE_STATS_WIDTH - (HIVE_STATS_PADDING * (NUM_PLAY_STATES + 1))) / (NUM_PLAY_STATES);
         for (0..NUM_PLAY_STATES) |i| {
-            const fi = @floatFromInt(f32, i);
-            const play_state = @enumFromInt(PlayState, i);
+            const fi = @as(f32, @floatFromInt(i));
+            const play_state = @as(PlayState, @enumFromInt(i));
             const position = Vec2{
                 .x = (1280 - HIVE_STATS_WIDTH) + ((HIVE_STATS_PADDING * (fi + 1)) + (fi * button_width)),
                 .y = CONTROLS_Y,
@@ -1632,7 +1632,7 @@ pub const Game = struct {
                     .position = position,
                     .size = .{ .x = button_width, .y = BUTTON_HEIGHT },
                 },
-                .value = @intCast(u8, i),
+                .value = @as(u8, @intCast(i)),
                 .text = @tagName(play_state),
             };
             self.controls.append(button) catch unreachable;
@@ -1658,7 +1658,7 @@ pub const Game = struct {
                     if (self.state.idle.hovered_button) |button_index| {
                         const button = self.buttons.items[button_index];
                         self.state = .{ .dragging = .{
-                            .room = @enumFromInt(RoomType, button.value),
+                            .room = @as(RoomType, @enumFromInt(button.value)),
                             .address = null,
                         } };
                         return;
@@ -1711,7 +1711,7 @@ pub const Game = struct {
 
     fn drawRoomCell(self: *Self, room: Room) void {
         var cell = self.arena.create(Cell) catch unreachable;
-        const scale = ZERO_CONSTRUCTED_CELL_SCALE + ((FULL_CELL_SCALE - ZERO_CONSTRUCTED_CELL_SCALE) * (@floatFromInt(f32, room.constructed) / NUM_BUILDERS_REQUIRED_PER_ROOM));
+        const scale = ZERO_CONSTRUCTED_CELL_SCALE + ((FULL_CELL_SCALE - ZERO_CONSTRUCTED_CELL_SCALE) * (@as(f32, @floatFromInt(room.constructed)) / NUM_BUILDERS_REQUIRED_PER_ROOM));
         cell.* = Cell.init(room.address, scale);
         {
             const color = OCCUPIED_HIVE_COLOR;
@@ -1968,7 +1968,7 @@ pub const Game = struct {
             }
         }
         for (self.controls.items) |button| {
-            const is_active = @enumFromInt(PlayState, button.value) == self.play_state;
+            const is_active = @as(PlayState, @enumFromInt(button.value)) == self.play_state;
             if (is_active) {
                 self.haathi.drawRect(.{
                     .position = button.rect.position.add(.{ .x = -3, .y = -3 }),
@@ -2004,7 +2004,7 @@ pub const Game = struct {
         }
         for (self.instructions, 0..) |line, i| {
             const x = 1280 - (HIVE_STATS_WIDTH / 2);
-            const y = 440 + (DATA_ROW_SPACING * @floatFromInt(f32, i));
+            const y = 440 + (DATA_ROW_SPACING * @as(f32, @floatFromInt(i)));
             self.haathi.drawText(.{
                 .position = .{ .x = x, .y = y },
                 .text = line,

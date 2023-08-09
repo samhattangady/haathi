@@ -43,7 +43,7 @@ const Pin = struct {
     fallen: bool = false,
 
     pub fn init(address: Vec2i, num_rows: usize) Self {
-        var self = Self{.address=address};
+        var self = Self{ .address = address };
         self.setPosition(num_rows);
         return self;
     }
@@ -54,8 +54,8 @@ const Pin = struct {
         const x_padding = spacing * 0.5;
         const y_padding = spacing * @cos(std.math.pi / 6.0);
         const origin = SCREEN_SIZE.scale(0.5);
-        self.position.x = origin.x + (x_padding * @floatFromInt(f32, self.address.x));
-        self.position.y = origin.y - (y_padding * @floatFromInt(f32, self.address.y));
+        self.position.x = origin.x + (x_padding * @as(f32, @floatFromInt(self.address.x)));
+        self.position.y = origin.y - (y_padding * @as(f32, @floatFromInt(self.address.y)));
     }
 };
 
@@ -72,7 +72,7 @@ const PinDrop = struct {
     gen: usize,
 };
 
-const Ball= struct {
+const Ball = struct {
     position: Vec2,
     address: Vec2i,
     direction: Vec2i,
@@ -85,7 +85,7 @@ const Phalanx = struct {
     queue: std.ArrayList(Dropper),
     ticks: u64 = 0,
     sim_generation: usize = 0,
-    ball: Ball= undefined,
+    ball: Ball = undefined,
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) Self {
@@ -101,13 +101,7 @@ const Phalanx = struct {
 
     fn setup(self: *Self) void {
         // setup 4 rows.
-        const addresses = [_]Vec2i{
-            .{.x=0, .y=0},
-            .{.x=-1, .y=1}, .{.x=1, .y=1},
-            .{.x=-2, .y=2}, .{.x=0, .y=2}, .{.x=2, .y=2},
-            .{.x=-3, .y=3}, .{.x=-1, .y=3}, .{.x=1, .y=3}, .{.x=3, .y=3},
-            .{.x=-4, .y=4}, .{.x=-2, .y=4}, .{.x=0, .y=4}, .{.x=2, .y=4}, .{.x=4, .y=4}
-    };
+        const addresses = [_]Vec2i{ .{ .x = 0, .y = 0 }, .{ .x = -1, .y = 1 }, .{ .x = 1, .y = 1 }, .{ .x = -2, .y = 2 }, .{ .x = 0, .y = 2 }, .{ .x = 2, .y = 2 }, .{ .x = -3, .y = 3 }, .{ .x = -1, .y = 3 }, .{ .x = 1, .y = 3 }, .{ .x = 3, .y = 3 }, .{ .x = -4, .y = 4 }, .{ .x = -2, .y = 4 }, .{ .x = 0, .y = 4 }, .{ .x = 2, .y = 4 }, .{ .x = 4, .y = 4 } };
         for (addresses) |adr| {
             const pin = Pin.init(adr, 4);
             self.pins.append(pin) catch unreachable;
@@ -117,8 +111,8 @@ const Phalanx = struct {
     fn throwBall(self: *Self) void {
         self.ball = .{
             .address = .{},
-            .direction = .{.x=-1, .y=1},
-            .position = SCREEN_SIZE.scale(0.5).add(.{.y=100}),
+            .direction = .{ .x = -1, .y = 1 },
+            .position = SCREEN_SIZE.scale(0.5).add(.{ .y = 100 }),
         };
         self.setBallPosition();
         self.sim_generation = 0;
@@ -127,7 +121,7 @@ const Phalanx = struct {
 
     fn setBallPosition(self: *Self) void {
         const pin = Pin.init(self.ball.address, 4);
-        self.ball.position = pin.position.add(.{.x=@floatFromInt(f32, self.ball.direction.x) * -25, .y = 25});
+        self.ball.position = pin.position.add(.{ .x = @as(f32, @floatFromInt(self.ball.direction.x)) * -25, .y = 25 });
     }
 
     fn simulationStep(self: *Self) void {
@@ -136,27 +130,27 @@ const Phalanx = struct {
             const drop = self.queue.orderedRemove(0);
             if (self.standingPinAt(drop.target)) |pin_index| {
                 self.pins.items[pin_index].fallen = true;
-                const fall = PinDrop{.index=pin_index, .prev=drop.index, .gen=self.sim_generation};
+                const fall = PinDrop{ .index = pin_index, .prev = drop.index, .gen = self.sim_generation };
                 self.drops.append(fall) catch unreachable;
                 self.queue.append(.{
-                    .target=drop.target.add(drop.direction),
-                    .index=pin_index,
+                    .target = drop.target.add(drop.direction),
+                    .index = pin_index,
                     .direction = drop.direction,
                 }) catch unreachable;
             }
         }
         if (self.standingPinAt(self.ball.address)) |pin_index| {
-                self.pins.items[pin_index].fallen = true;
-                const fall = PinDrop{.index=pin_index, .prev=null, .gen=self.sim_generation};
-                self.drops.append(fall) catch unreachable;
-                self.queue.append(.{
-                    .target=self.ball.address.add(self.ball.direction),
-                    .index=pin_index,
-                    .direction = self.ball.direction,
-                }) catch unreachable;
+            self.pins.items[pin_index].fallen = true;
+            const fall = PinDrop{ .index = pin_index, .prev = null, .gen = self.sim_generation };
+            self.drops.append(fall) catch unreachable;
+            self.queue.append(.{
+                .target = self.ball.address.add(self.ball.direction),
+                .index = pin_index,
+                .direction = self.ball.direction,
+            }) catch unreachable;
             self.ball.direction.x *= -1;
-            }
-        self.sim_generation+=1;
+        }
+        self.sim_generation += 1;
         self.ball.address = self.ball.address.add(self.ball.direction);
         self.setBallPosition();
     }
@@ -236,12 +230,12 @@ pub const Game = struct {
                 });
             }
         }
-            self.haathi.drawRect(.{
-                .position = self.phalanx.ball.position,
-                .size = .{ .x = 50, .y = 50},
-                .color = colors.endesga_blue2,
-                .centered = true,
-                .radius = 50,
-            });
+        self.haathi.drawRect(.{
+            .position = self.phalanx.ball.position,
+            .size = .{ .x = 50, .y = 50 },
+            .color = colors.endesga_blue2,
+            .centered = true,
+            .radius = 50,
+        });
     }
 };

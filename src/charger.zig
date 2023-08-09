@@ -67,10 +67,10 @@ pub const Game = struct {
         const x_gaps: f32 = SCREEN_SIZE.x / (NUM_COLS + 1);
         const y_gaps: f32 = SCREEN_SIZE.y / (NUM_ROWS + 1);
         for (0..NUM_ROWS) |y| {
-            const yf = @floatFromInt(f32, y);
+            const yf = @as(f32, @floatFromInt(y));
             for (0..NUM_COLS) |x| {
                 const index = (y * NUM_COLS) + x;
-                const xf = @floatFromInt(f32, x);
+                const xf = @as(f32, @floatFromInt(x));
                 self.cells[index] = .{
                     .position = .{ .x = x_gaps * (xf + 1), .y = y_gaps * (yf + 1) },
                     .address = .{ .row = y, .col = x },

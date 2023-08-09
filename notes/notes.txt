@@ -798,3 +798,9 @@ hits the remaining 3 pin pyramid at the exact same spot, and the same thing
 continues.
 
 Damn. I'm a little confused again.
+
+---
+
+09 Aug 2023:
+Was travelling today. Just want to update to the newest zig version right now
+though. I think that would be enough to do for today.

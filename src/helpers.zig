@@ -10,8 +10,8 @@ pub const Vec2 = struct {
 
     pub fn fromInts(x: anytype, y: anytype) Vec2 {
         return Vec2{
-            .x = @floatFromInt(f32, x),
-            .y = @floatFromInt(f32, y),
+            .x = @as(f32, @floatFromInt(x)),
+            .y = @as(f32, @floatFromInt(y)),
         };
     }
 
@@ -85,8 +85,8 @@ pub const Vec2 = struct {
 
     pub fn round(v: *const Self) Vec2i {
         return .{
-            .x = @intFromFloat(i32, @round(v.x)),
-            .y = @intFromFloat(i32, @round(v.y)),
+            .x = @as(i32, @intFromFloat(@round(v.x))),
+            .y = @as(i32, @intFromFloat(@round(v.y))),
         };
     }
 
@@ -141,8 +141,8 @@ pub const Vec2i = struct {
 
     pub fn toVec2(v: *const Self) Vec2 {
         return .{
-            .x = @floatFromInt(f32, v.x),
-            .y = @floatFromInt(f32, v.y),
+            .x = @as(f32, @floatFromInt(v.x)),
+            .y = @as(f32, @floatFromInt(v.y)),
         };
     }
 
@@ -186,10 +186,10 @@ pub const Vec4 = struct {
         std.debug.assert(hex[0] == '#'); // hex_rgba needs to be in "#rrggbbaa" format
         std.debug.assert(hex.len == 9); // hex_rgba needs to be in "#rrggbbaa" format
         var self = Vec4{};
-        self.x = @floatFromInt(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
-        self.y = @floatFromInt(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
-        self.z = @floatFromInt(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
-        self.w = @floatFromInt(f32, std.fmt.parseInt(u8, hex[7..9], 16) catch unreachable) / 255.0;
+        self.x = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable)) / 255.0;
+        self.y = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable)) / 255.0;
+        self.z = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable)) / 255.0;
+        self.w = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[7..9], 16) catch unreachable)) / 255.0;
         return self;
     }
 
@@ -198,9 +198,9 @@ pub const Vec4 = struct {
         std.debug.assert(hex[0] == '#'); // hex_rgba needs to be in "#rrggbb" format
         std.debug.assert(hex.len == 7); // hex_rgba needs to be in "#rrggbb" format
         var self = Vec4{};
-        self.x = @floatFromInt(f32, std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable) / 255.0;
-        self.y = @floatFromInt(f32, std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable) / 255.0;
-        self.z = @floatFromInt(f32, std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable) / 255.0;
+        self.x = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[1..3], 16) catch unreachable)) / 255.0;
+        self.y = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[3..5], 16) catch unreachable)) / 255.0;
+        self.z = @as(f32, @floatFromInt(std.fmt.parseInt(u8, hex[5..7], 16) catch unreachable)) / 255.0;
         self.w = 1.0;
         return self;
     }
@@ -209,10 +209,10 @@ pub const Vec4 = struct {
         std.debug.assert(buffer.len >= 10);
         buffer[0] = '#';
         buffer[9] = 0;
-        _ = std.fmt.bufPrint(buffer[1..9], "{x:0>2}", .{@intFromFloat(u8, self.x * 255)}) catch unreachable;
-        _ = std.fmt.bufPrint(buffer[3..5], "{x:0>2}", .{@intFromFloat(u8, self.y * 255)}) catch unreachable;
-        _ = std.fmt.bufPrint(buffer[5..7], "{x:0>2}", .{@intFromFloat(u8, self.z * 255)}) catch unreachable;
-        _ = std.fmt.bufPrint(buffer[7..9], "{x:0>2}", .{@intFromFloat(u8, self.w * 255)}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[1..9], "{x:0>2}", .{@as(u8, @intFromFloat(self.x * 255))}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[3..5], "{x:0>2}", .{@as(u8, @intFromFloat(self.y * 255))}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[5..7], "{x:0>2}", .{@as(u8, @intFromFloat(self.z * 255))}) catch unreachable;
+        _ = std.fmt.bufPrint(buffer[7..9], "{x:0>2}", .{@as(u8, @intFromFloat(self.w * 255))}) catch unreachable;
     }
 
     pub fn alpha(self: *const Vec4, a: f32) Vec4 {
@@ -314,7 +314,7 @@ pub fn easeinoutf(start: f32, end: f32, t: f32) f32 {
 }
 
 pub fn milliTimestamp() u64 {
-    return @intCast(u64, c.milliTimestamp());
+    return @as(u64, @intCast(c.milliTimestamp()));
 }
 
 pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
@@ -435,6 +435,6 @@ pub fn enumChange(val: anytype, change: i8, loop: bool) @TypeOf(val) {
     const T = @TypeOf(val);
     const max = @typeInfo(T).Enum.fields.len - 1;
     const index = @intFromEnum(val);
-    const new_index = applyChange(@intCast(u8, index), change, @intCast(u8, max), loop);
-    return @enumFromInt(T, new_index);
+    const new_index = applyChange(@as(u8, @intCast(index)), change, @as(u8, @intCast(max)), loop);
+    return @as(T, @enumFromInt(new_index));
 }

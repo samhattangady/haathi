@@ -402,11 +402,11 @@ const Path = struct {
         self.points[self.points.len - 2] = end_curve;
         self.points[self.points.len - 1] = end;
         for (2..MID_POINT_INDEX) |i| {
-            const fract = @floatFromInt(f32, i - 1) / (MID_POINT_INDEX - 1 - 1);
+            const fract = @as(f32, @floatFromInt(i - 1)) / (MID_POINT_INDEX - 1 - 1);
             self.points[i] = start_curve.lerp(mid_point, fract);
         }
         for (MID_POINT_INDEX + 1..self.points.len - 2) |i| {
-            const fract = @floatFromInt(f32, i - MID_POINT_INDEX + 1) / (self.points.len - 2);
+            const fract = @as(f32, @floatFromInt(i - MID_POINT_INDEX + 1)) / (self.points.len - 2);
             self.points[i] = mid_point.lerp(end_curve, fract);
         }
         self.initDistances();
@@ -416,7 +416,7 @@ const Path = struct {
     pub fn initEndpoints(p0: Vec2, p1: Vec2) Self {
         var self: Self = undefined;
         for (0..self.points.len) |i| {
-            const fract = @floatFromInt(f32, i) / (self.points.len - 1);
+            const fract = @as(f32, @floatFromInt(i)) / (self.points.len - 1);
             self.points[i] = p0.lerp(p1, fract);
         }
         self.initDistances();
@@ -668,7 +668,7 @@ const Intersection = struct {
 
     fn getLanePosition(self: *const Self, lane_index: u8, position: u8) Vec2 {
         const lane = self.lanes.items[lane_index];
-        const offset_amount: f32 = 1 + @floatFromInt(f32, position);
+        const offset_amount: f32 = 1 + @as(f32, @floatFromInt(position));
         const offset = lane.toward.scale(-1 * CAR_SPACING * offset_amount);
         return lane.head.add(offset);
     }
@@ -800,7 +800,7 @@ const Intersection = struct {
     fn addConnection(self: *Self, sensor_slot: SensorSlot, signal_slot: SignalSlot) void {
         if (self.steps > 0) return;
         self.connections.append(.{
-            .effect = @enumFromInt(ConnectionEffect, signal_slot.slot_index),
+            .effect = @as(ConnectionEffect, @enumFromInt(signal_slot.slot_index)),
             .sensor_slot = sensor_slot,
             .signal_slot = signal_slot,
         }) catch unreachable;
@@ -1007,7 +1007,7 @@ pub const Game = struct {
                     .position = .{ .x = PANE_X + PANE_PADDING, .y = SCREEN_SIZE.y - (PANE_PADDING + button_size.y + 20) },
                     .size = button_size,
                 },
-                .value = @intCast(u8, @intFromEnum(ButtonAction.prev_level)),
+                .value = @as(u8, @intCast(@intFromEnum(ButtonAction.prev_level))),
                 .text = "<",
             }) catch unreachable;
             self.buttons.append(.{
@@ -1015,7 +1015,7 @@ pub const Game = struct {
                     .position = .{ .x = SCREEN_SIZE.x - PANE_PADDING - button_size.x, .y = SCREEN_SIZE.y - (PANE_PADDING + button_size.y + 20) },
                     .size = button_size,
                 },
-                .value = @intCast(u8, @intFromEnum(ButtonAction.next_level)),
+                .value = @as(u8, @intCast(@intFromEnum(ButtonAction.next_level))),
                 .text = ">",
             }) catch unreachable;
         }
@@ -1030,7 +1030,7 @@ pub const Game = struct {
                     },
                     .size = button_size,
                 },
-                .value = @intCast(u8, @intFromEnum(ButtonAction.clear_level)),
+                .value = @as(u8, @intCast(@intFromEnum(ButtonAction.clear_level))),
                 .text = "Clear",
             }) catch unreachable;
             self.buttons.append(.{
@@ -1041,7 +1041,7 @@ pub const Game = struct {
                     },
                     .size = button_size,
                 },
-                .value = @intCast(u8, @intFromEnum(ButtonAction.step_forward)),
+                .value = @as(u8, @intCast(@intFromEnum(ButtonAction.step_forward))),
                 .text = "Step",
             }) catch unreachable;
             self.buttons.append(.{
@@ -1052,7 +1052,7 @@ pub const Game = struct {
                     },
                     .size = button_size,
                 },
-                .value = @intCast(u8, @intFromEnum(ButtonAction.reset_level)),
+                .value = @as(u8, @intCast(@intFromEnum(ButtonAction.reset_level))),
                 .text = "Reset",
             }) catch unreachable;
         }
@@ -1082,7 +1082,7 @@ pub const Game = struct {
                 for (self.intersection.lanes.items, 0..) |lane, i| {
                     if (lane.lane == .outgoing) continue;
                     if (lane.rect.contains(mouse_pos)) {
-                        self.intersection.addCar(@intCast(u8, i), @intCast(u8, i + 1));
+                        self.intersection.addCar(@as(u8, @intCast(i)), @as(u8, @intCast(i + 1)));
                         return;
                     }
                 }
@@ -1107,7 +1107,7 @@ pub const Game = struct {
                 for (self.intersection.lanes.items, 0..) |lane, i| {
                     if (lane.lane == .outgoing) continue;
                     if (lane.rect.contains(mouse_pos)) {
-                        self.intersection.removeCar(@intCast(u8, i));
+                        self.intersection.removeCar(@as(u8, @intCast(i)));
                         return;
                     }
                 }
@@ -1124,7 +1124,7 @@ pub const Game = struct {
                 for (self.intersection.cars.items) |*car| {
                     if (car.position.distanceSqr(mouse_pos) < std.math.pow(f32, CAR_SIZE.x, 2)) {
                         const current = std.mem.indexOfScalar(u8, destination_lanes[0..], car.destination_lane_index).?;
-                        const next_index = helpers.applyChangeLooped(@intCast(u8, current), @intCast(i8, std.math.sign(self.haathi.inputs.mouse.wheel_y)), destination_lanes.len - 1);
+                        const next_index = helpers.applyChangeLooped(@as(u8, @intCast(current)), @as(i8, @intCast(std.math.sign(self.haathi.inputs.mouse.wheel_y))), destination_lanes.len - 1);
                         car.destination_lane_index = destination_lanes[next_index];
                         return;
                     }
@@ -1141,7 +1141,7 @@ pub const Game = struct {
         }
         for (self.buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.buttons.items) |button| {
-            if (button.clicked) self.performAction(@enumFromInt(ButtonAction, button.value));
+            if (button.clicked) self.performAction(@as(ButtonAction, @enumFromInt(button.value)));
         }
         switch (self.state) {
             .idle => |_| {
@@ -1153,8 +1153,8 @@ pub const Game = struct {
                             if (slot.contains(mouse_pos)) {
                                 self.cursor = .pointer;
                                 self.state.idle.hovered_sensor = .{
-                                    .sensor_index = @intCast(u8, sensor_index),
-                                    .slot_index = @intCast(u8, slot_index),
+                                    .sensor_index = @as(u8, @intCast(sensor_index)),
+                                    .slot_index = @as(u8, @intCast(slot_index)),
                                 };
                             }
                         }
@@ -1197,8 +1197,8 @@ pub const Game = struct {
                         for (signal.slots, 0..) |slot, slot_index| {
                             if (slot.contains(mouse_pos)) {
                                 self.state.creating_connection.ending_slot = .{
-                                    .signal_index = @intCast(u8, signal_index),
-                                    .slot_index = @intCast(u8, slot_index),
+                                    .signal_index = @as(u8, @intCast(signal_index)),
+                                    .slot_index = @as(u8, @intCast(slot_index)),
                                 };
                                 break :find_signal_slot;
                             }
@@ -1542,11 +1542,11 @@ pub const Game = struct {
         {
             const indicator_size = Vec2{ .x = 18, .y = 18 };
             const width = PANE_WIDTH - (PANE_PADDING * 2);
-            const padding = (width - (indicator_size.x * @floatFromInt(f32, LEVELS.len))) / @floatFromInt(f32, LEVELS.len - 1);
+            const padding = (width - (indicator_size.x * @as(f32, @floatFromInt(LEVELS.len)))) / @as(f32, @floatFromInt(LEVELS.len - 1));
             const start_x = PANE_X + PANE_PADDING;
             const start_y = SCREEN_SIZE.y - PANE_PADDING - 8;
             for (self.levels_complete, 0..) |lev, i| {
-                const fi = @floatFromInt(f32, i);
+                const fi = @as(f32, @floatFromInt(i));
                 const x = start_x + (indicator_size.x * fi) + (padding * fi);
                 if (i == self.level_index) {
                     self.haathi.drawRect(.{

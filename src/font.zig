@@ -66,11 +66,11 @@ pub fn main() !void {
     // load all the codepoints into their own bitmaps.
     for (START_CODEPOINT..END_CODEPOINT) |codepoint| {
         var bmp: BitmapData = undefined;
-        bmp.data = c.stbtt_GetCodepointBitmap(&font_info, scale, scale, @intCast(i32, codepoint), &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
+        bmp.data = c.stbtt_GetCodepointBitmap(&font_info, scale, scale, @as(i32, @intCast(codepoint)), &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
         // bmp.data = c.stbtt_GetCodepointSDF(&font_info, scale, @intCast(i32, codepoint), 1, 1, 1, &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
         var advance: i32 = undefined;
-        c.stbtt_GetCodepointHMetrics(&font_info, @intCast(i32, codepoint), &advance, 0);
-        bmp.xadvance = @floatFromInt(f32, advance) * scale;
+        c.stbtt_GetCodepointHMetrics(&font_info, @as(i32, @intCast(codepoint)), &advance, 0);
+        bmp.xadvance = @as(f32, @floatFromInt(advance)) * scale;
         bitmaps.put(codepoint, bmp) catch unreachable;
     }
     // pack all the rects within a texture
@@ -80,7 +80,7 @@ pub fn main() !void {
     while (codepoints.next()) |codepoint| {
         const bmp = bitmaps.get(codepoint.*).?;
         rects.append(.{
-            .id = @intCast(i32, codepoint.*),
+            .id = @as(i32, @intCast(codepoint.*)),
             // add padding to the rects
             .w = bmp.width + PADDING,
             .h = bmp.height + PADDING,
@@ -97,8 +97,8 @@ pub fn main() !void {
         for (0..rects.items.len) |_| {
             nodes.append(undefined) catch unreachable;
         }
-        _ = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @intCast(i32, nodes.items.len));
-        var was_packed = c.stbrp_pack_rects(&packer_context, &rects.items[0], @intCast(i32, rects.items.len));
+        _ = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @as(i32, @intCast(nodes.items.len)));
+        var was_packed = c.stbrp_pack_rects(&packer_context, &rects.items[0], @as(i32, @intCast(rects.items.len)));
         if (was_packed == 0) {} //std.debug.print("Could not pack rects \n", .{});
     }
     var font_bitmap = gpa.allocator().alloc(u8, FONT_TEX_WIDTH * FONT_TEX_HEIGHT) catch unreachable;
@@ -107,18 +107,18 @@ pub fn main() !void {
     for (rects.items) |rect| {
         // copy the bmp into the font
         // The fonts are loaded in upside down. So we need to flip each char.
-        const start_x = @intCast(usize, rect.x);
-        const start_y = @intCast(usize, rect.y);
+        const start_x = @as(usize, @intCast(rect.x));
+        const start_y = @as(usize, @intCast(rect.y));
         const width = rect.w;
         const height = rect.h;
-        const char_bitmap = bitmaps.get(@intCast(usize, rect.id)).?.data;
+        const char_bitmap = bitmaps.get(@as(usize, @intCast(rect.id))).?.data;
         defer c.stbtt_FreeBitmap(char_bitmap, null);
         var y: usize = 0;
         while (y < height - PADDING) : (y += 1) {
             var x: usize = 0;
             while (x < width - PADDING) : (x += 1) {
                 const f_b_index = (x + start_x) + ((y + start_y) * FONT_TEX_WIDTH);
-                const c_b_index = x + (y * @intCast(usize, width - PADDING));
+                const c_b_index = x + (y * @as(usize, @intCast(width - PADDING)));
                 font_bitmap[f_b_index] = char_bitmap[c_b_index];
                 // std.debug.print("{c}", .{alpha[char_bitmap[c_b_index] >> 5]});
             }
@@ -147,16 +147,16 @@ pub fn main() !void {
         try js.objectField("glyphs");
         try js.beginObject();
         for (rects.items) |rect| {
-            const bmp = bitmaps.get(@intCast(usize, rect.id)).?;
+            const bmp = bitmaps.get(@as(usize, @intCast(rect.id))).?;
             var buffer: [8]u8 = undefined;
             const field_name = std.fmt.bufPrint(&buffer, "{d}", .{rect.id}) catch unreachable;
             try js.objectField(field_name);
             try js.beginObject();
             {
                 try js.objectField("x0");
-                try js.emitNumber(@floatFromInt(f32, rect.x) / FONT_TEX_WIDTH);
+                try js.emitNumber(@as(f32, @floatFromInt(rect.x)) / FONT_TEX_WIDTH);
                 try js.objectField("y0");
-                try js.emitNumber(@floatFromInt(f32, rect.y) / FONT_TEX_HEIGHT);
+                try js.emitNumber(@as(f32, @floatFromInt(rect.y)) / FONT_TEX_HEIGHT);
                 try js.objectField("w");
                 try js.emitNumber(rect.w - PADDING);
                 try js.objectField("h");

@@ -61,7 +61,7 @@ const TEXT_2_YOFF = COMPONENT_HEIGHT - 7;
 fn sineWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     var points: [DISPLAY_SIZE]f32 = undefined;
     for (0..DISPLAY_SIZE) |i| {
-        var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
+        var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
         points[i] = @sin(val);
     }
     return points;
@@ -70,7 +70,7 @@ fn sineWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
 fn cosWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     var points: [DISPLAY_SIZE]f32 = undefined;
     for (0..DISPLAY_SIZE) |i| {
-        var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
+        var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
         points[i] = @cos(val);
     }
     return points;
@@ -90,66 +90,66 @@ fn stage(lvl: usize) WaveDisplay {
     switch (lvl) {
         0 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = (@sin(val));
             }
         },
         1 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = @fabs(@sin(val));
             }
         },
         2 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = @fabs(@cos(val));
             }
         },
         3 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = 0.5 + (@sin(val * 2) * 0.25);
             }
         },
         4 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = -0.5 + (@fabs(@cos(val * 2)) * -0.25);
             }
         },
         5 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = @max(t, @sin(val));
             }
         },
         6 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = (@sin(val) * (1 - t));
             }
         },
         7 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const sin = 2 * @sin(val * 2);
                 wave.points[i] = @min(@max(-1, sin), 1);
             }
         },
         8 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @floatFromInt(f32, i) / DISPLAY_SIZE;
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const cos2t = @cos(val * 2);
                 wave.points[i] = @min(t, @max(cos2t, -t));
             }
         },
         9 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@floatFromInt(f32, i) / DISPLAY_SIZE) * std.math.pi * 2;
+                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const cos2t = @cos(val * 2) * 0.5;
                 wave.points[i] = @max(@max(0, cos2t), @min(1, @cos(val) * 2));
             }
@@ -423,17 +423,17 @@ pub const Component = struct {
                 for (self.stems) |stem| _ = components[stem].addInput(val);
             },
             .scale_t => {
-                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const t = @as(f32, @floatFromInt(index)) / @as(f32, @floatFromInt(DISPLAY_SIZE));
                 const val = if (self.inputs.len == 0) 0 else self.inputs[0] * t;
                 for (self.stems) |stem| _ = components[stem].addInput(val);
             },
             .scale_one_minus_t => {
-                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const t = @as(f32, @floatFromInt(index)) / @as(f32, @floatFromInt(DISPLAY_SIZE));
                 const val = if (self.inputs.len == 0) 0 else self.inputs[0] * (1 - t);
                 for (self.stems) |stem| _ = components[stem].addInput(val);
             },
             .scale_two_t => {
-                const t = @floatFromInt(f32, index) / @floatFromInt(f32, DISPLAY_SIZE);
+                const t = @as(f32, @floatFromInt(index)) / @as(f32, @floatFromInt(DISPLAY_SIZE));
                 const val = if (self.inputs.len == 0) 0 else self.inputs[0] * (2 * t);
                 for (self.stems) |stem| _ = components[stem].addInput(val);
             },
@@ -441,7 +441,7 @@ pub const Component = struct {
                 var avg_val: f32 = 0;
                 if (self.inputs.len > 0) {
                     for (self.inputs) |input| avg_val += input;
-                    avg_val = avg_val / @floatFromInt(f32, self.inputs.len);
+                    avg_val = avg_val / @as(f32, @floatFromInt(self.inputs.len));
                 }
                 for (self.stems) |stem| _ = components[stem].addInput(avg_val);
             },
@@ -547,9 +547,9 @@ pub const Game = struct {
             for (BUTTONS, 0..) |button_row, row| {
                 for (button_row, 0..) |button, col| {
                     if (button == .const_zero) continue;
-                    const col_x = @floatFromInt(f32, col);
+                    const col_x = @as(f32, @floatFromInt(col));
                     const x = (1280 - DISPLAY_BOX_SIZE.x - (2 * DISPLAY_PADDING)) + (button_padding_x * (col_x + 1)) + (col_x * COMPONENT_WIDTH);
-                    const y = 720 - ((1.3 * button_padding_y) + (@floatFromInt(f32, row) * ((button_padding_y / 2) + COMPONENT_HEIGHT)));
+                    const y = 720 - ((1.3 * button_padding_y) + (@as(f32, @floatFromInt(row)) * ((button_padding_y / 2) + COMPONENT_HEIGHT)));
                     // const y = button_padding_y + ((@floatFromInt(f32, row) + (NUM_COMPONENT_ROWS - BUTTONS.len)) * ((button_padding_y / 2) + COMPONENT_HEIGHT));
                     buttons.append(.{
                         .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
@@ -563,17 +563,17 @@ pub const Game = struct {
             const component_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
             const component_padding_x: f32 = ((1280 - DISPLAY_BOX_SIZE.x - (DISPLAY_PADDING * 2)) - (NUM_COMPONENT_COLS * COMPONENT_WIDTH)) / (NUM_COMPONENT_COLS + 1);
             for (0..NUM_COMPONENT_COLS) |col| {
-                const j = @floatFromInt(f32, col);
+                const j = @as(f32, @floatFromInt(col));
                 const x = ((j + 1) * component_padding_x) + (j * COMPONENT_WIDTH);
                 for (0..NUM_COMPONENT_ROWS) |row| {
-                    const i = @floatFromInt(f32, row);
+                    const i = @as(f32, @floatFromInt(row));
                     const y = ((i + 1) * component_padding_y) + (i * COMPONENT_HEIGHT);
-                    const t: ?ComponentType = if (col == 0) @enumFromInt(ComponentType, row) else null;
+                    const t: ?ComponentType = if (col == 0) @as(ComponentType, @enumFromInt(row)) else null;
                     slots.append(.{
                         .rect = .{ .position = .{ .x = x, .y = y }, .size = .{ .x = COMPONENT_WIDTH, .y = COMPONENT_HEIGHT } },
                         .component_type = t,
-                        .row = @intCast(u8, row),
-                        .col = @intCast(u8, col),
+                        .row = @as(u8, @intCast(row)),
+                        .col = @as(u8, @intCast(col)),
                     }) catch unreachable;
                 }
             }
@@ -697,7 +697,7 @@ pub const Game = struct {
                     }
                     if (self.state.idle.hovered_slot) |hs| {
                         if (self.slots.items[hs].component_type != null) {
-                            self.state = .{ .create_connection = .{ .root = @intCast(u8, hs) } };
+                            self.state = .{ .create_connection = .{ .root = @as(u8, @intCast(hs)) } };
                             return;
                         }
                     }
@@ -756,8 +756,8 @@ pub const Game = struct {
                     if (!slot.component_type.?.acceptInput()) continue;
                     if (slot.rect.contains(mouse.current_pos)) {
                         if (i > data.root) {
-                            self.state.create_connection.stem = @intCast(u8, i);
-                            self.temp_connection = .{ .root = data.root, .stem = @intCast(u8, i) };
+                            self.state.create_connection.stem = @as(u8, @intCast(i));
+                            self.temp_connection = .{ .root = data.root, .stem = @as(u8, @intCast(i)) };
                         }
                     }
                 }
@@ -831,9 +831,9 @@ pub const Game = struct {
             defer index_map.deinit();
             for (self.slots.items, 0..) |slot, si| {
                 if (slot.component_type) |ct| {
-                    const comp_index = @intCast(u8, self.components.items.len);
+                    const comp_index = @as(u8, @intCast(self.components.items.len));
                     self.components.append(Component.new(ct)) catch unreachable;
-                    index_map.put(@intCast(u8, si), comp_index) catch unreachable;
+                    index_map.put(@as(u8, @intCast(si)), comp_index) catch unreachable;
                 }
             }
             for (self.connections.items) |conn| {
@@ -978,7 +978,7 @@ pub const Game = struct {
             for (displays, cols, widths, 0..) |display, col, w, di| {
                 if (di == 2 and !self.show_display_graph) continue;
                 for (display.points, 0..) |point, i| {
-                    const x = box_pos.x + padding + @floatFromInt(f32, i) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
+                    const x = box_pos.x + padding + @as(f32, @floatFromInt(i)) / (DISPLAY_SIZE - 1) * (box_size.x - padding * 2);
                     const y = box_pos.y + padding + ((box_size.y - (2 * padding)) / 2) - (point * ((box_size.y - (2 * padding)) / 2));
                     display.display[i] = .{ .x = x, .y = y };
                 }
@@ -1096,10 +1096,10 @@ pub const Game = struct {
             // stage select
             const x_start = 1280 - DISPLAY_PADDING - DISPLAY_BOX_SIZE.x;
             const x_end = 1280 - DISPLAY_PADDING;
-            const stage_padding: f32 = ((x_end - x_start) - (@floatFromInt(f32, STAGES.len) * STAGE_SELECT_SIZE)) / @floatFromInt(f32, STAGES.len - 1);
+            const stage_padding: f32 = ((x_end - x_start) - (@as(f32, @floatFromInt(STAGES.len)) * STAGE_SELECT_SIZE)) / @as(f32, @floatFromInt(STAGES.len - 1));
             for (0..STAGES.len) |i| {
                 const pos = Vec2{
-                    .x = x_start + ((stage_padding + STAGE_SELECT_SIZE) * @floatFromInt(f32, i)),
+                    .x = x_start + ((stage_padding + STAGE_SELECT_SIZE) * @as(f32, @floatFromInt(i))),
                     .y = STAGE_SELECT_Y,
                 };
                 if (i == self.stage_index) {

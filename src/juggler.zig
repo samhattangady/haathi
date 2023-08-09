@@ -78,13 +78,13 @@ const BallPath = struct {
         if (progress > NUM_BALL_PATH_POINTS) {
             return self.points[NUM_BALL_PATH_POINTS - 1];
         }
-        const ticks = @floatFromInt(f32, self.progress_ticks);
+        const ticks = @as(f32, @floatFromInt(self.progress_ticks));
         const index = ticks / PATH_TICK_RATE;
-        const prev_index = @intFromFloat(usize, @round(index - 0.5));
+        const prev_index = @as(usize, @intFromFloat(@round(index - 0.5)));
         if (prev_index > NUM_BALL_PATH_POINTS - 2) return self.points[NUM_BALL_PATH_POINTS - 1];
         const prev = self.points[prev_index];
         const next = self.points[prev_index + 1];
-        const amount = index - @floatFromInt(f32, prev_index);
+        const amount = index - @as(f32, @floatFromInt(prev_index));
         std.debug.assert(amount <= 1);
         return prev.lerp(next, amount);
     }
@@ -113,12 +113,12 @@ const Trail = struct {
         const lines = arena.alloc(TrailLine, TRAIL_SIZE - 1) catch unreachable;
         var i: isize = 0;
         while (i < TRAIL_SIZE - 1) : (i += 1) {
-            const p0 = @mod(@intCast(isize, self.start_index) - i, TRAIL_SIZE);
-            const p1 = @mod(@intCast(isize, self.start_index) - i - 1, TRAIL_SIZE);
-            const width = helpers.lerpf(TRAIL_WIDTH, 0, @floatFromInt(f32, i) / TRAIL_SIZE);
-            const index = @intCast(usize, i);
+            const p0 = @mod(@as(isize, @intCast(self.start_index)) - i, TRAIL_SIZE);
+            const p1 = @mod(@as(isize, @intCast(self.start_index)) - i - 1, TRAIL_SIZE);
+            const width = helpers.lerpf(TRAIL_WIDTH, 0, @as(f32, @floatFromInt(i)) / TRAIL_SIZE);
+            const index = @as(usize, @intCast(i));
             lines[index] = .{
-                .points = [2]Vec2{ self.points[@intCast(usize, p0)], self.points[@intCast(usize, p1)] },
+                .points = [2]Vec2{ self.points[@as(usize, @intCast(p0))], self.points[@as(usize, @intCast(p1))] },
                 .width = width,
             };
         }
@@ -229,7 +229,7 @@ const ThrowParams = struct {
         // y = sqrt(2*H*g)
         // x = (R*g) / y
         const dir: f32 = if (side == .left) -1 else 1;
-        const max_height = @floatFromInt(f32, self.height.power()) * HEIGHT_OFFSET;
+        const max_height = @as(f32, @floatFromInt(self.height.power())) * HEIGHT_OFFSET;
         const range = self.target.powerf() * HAND_SLOT_OFFSET_AMOUNT;
         const y = @sqrt(2 * max_height * GRAVITY) * -1;
         const x = (range * GRAVITY) / (2 * @fabs(y));
@@ -353,7 +353,7 @@ const Track = struct {
 
     pub fn initSlots(self: *Self) void {
         for (0..NUM_SLOTS_IN_TRACK) |i| {
-            const fi = @floatFromInt(f32, i);
+            const fi = @as(f32, @floatFromInt(i));
             self.slots.append(.{
                 .position = .{
                     .x = self.rect.position.x + ((fi + 1) * SLOT_PADDING) + (fi * SLOT_WIDTH),
@@ -522,9 +522,9 @@ const Hand = struct {
     pub fn update(self: *Self, dt: u64, juggler: *Juggler) void {
         if (DEBUG_PRINTF3) c.debugPrint("hand update 0");
         self.ticks += dt;
-        self.step_f += @floatFromInt(f32, dt) / STEP_TICKS;
-        self.step_f = @mod(self.step_f, @floatFromInt(f32, self.num_steps));
-        const new_step_index = @intFromFloat(usize, self.step_f) % self.num_steps;
+        self.step_f += @as(f32, @floatFromInt(dt)) / STEP_TICKS;
+        self.step_f = @mod(self.step_f, @as(f32, @floatFromInt(self.num_steps)));
+        const new_step_index = @as(usize, @intFromFloat(self.step_f)) % self.num_steps;
         // if step_index is first of new instruction, then inc it.
         if (DEBUG_PRINTF3) c.debugPrint("hand update 1");
         if (new_step_index != self.step_index) {
@@ -554,7 +554,7 @@ const Hand = struct {
                 }
             },
             .moving => |move| {
-                const progress = @floatFromInt(f32, self.ticks - move.move_start_ticks) / HAND_MOVE_DURATION_TICKS;
+                const progress = @as(f32, @floatFromInt(self.ticks - move.move_start_ticks)) / HAND_MOVE_DURATION_TICKS;
                 if (progress >= 1) {
                     self.position = move.target_position;
                     // self.incInstIndex();
@@ -616,13 +616,13 @@ const Hand = struct {
     pub fn setStepIndex(self: *Self, index: f32) void {
         if (DEBUG_PRINTF4) c.debugPrint("hand setStepIndex 0");
         var sum: usize = 0;
-        self.step_index = @intFromFloat(u8, index);
+        self.step_index = @as(u8, @intFromFloat(index));
         self.step_f = index;
         self.inst_index = 0;
         if (DEBUG_PRINTF4) c.debugPrint("hand setStepIndex 1");
         for (self.instructions.items, 0..) |inst, i| {
             if (self.step_index >= sum and self.step_index < sum + inst.length) {
-                self.inst_index = @intCast(u8, i);
+                self.inst_index = @as(u8, @intCast(i));
                 break;
             }
             sum += inst.length;
@@ -675,7 +675,7 @@ const Hand = struct {
 
     fn incInstIndex(self: *Self) void {
         self.holdPalmedBall();
-        self.inst_index = helpers.applyChangeLooped(self.inst_index, 1, @intCast(u8, self.instructions.items.len - 1));
+        self.inst_index = helpers.applyChangeLooped(self.inst_index, 1, @as(u8, @intCast(self.instructions.items.len - 1)));
         self.setInstIndex(self.inst_index);
     }
 
@@ -731,7 +731,7 @@ const Juggler = struct {
     }
 
     pub fn changeOffset(self: *Self, i: usize, change: i32) void {
-        self.hand_offsets[i] = helpers.applyChange(self.hand_offsets[i], -change, @floatFromInt(f32, self.hands[i].num_steps), false);
+        self.hand_offsets[i] = helpers.applyChange(self.hand_offsets[i], -change, @as(f32, @floatFromInt(self.hands[i].num_steps)), false);
         self.reset();
     }
 
@@ -819,7 +819,7 @@ const Movement = enum {
     pub fn offset(self: *const Movement, side: HandSide) Vec2 {
         const hand: f32 = if (side == .left) -1 else 1;
         const dir: f32 = if (self.in()) 1 else -1;
-        const amount = @floatFromInt(f32, self.num_slots());
+        const amount = @as(f32, @floatFromInt(self.num_slots()));
         return .{ .x = dir * hand * amount * HAND_SLOT_OFFSET_AMOUNT };
     }
 };
@@ -897,7 +897,7 @@ pub const Game = struct {
         if (DEBUG_PRINTF) c.debugPrint("game setup 0");
         self.setupCascadeBlocks();
         for (0..NUM_THROW_TARGETS) |i| {
-            const target = @enumFromInt(ThrowTarget, i);
+            const target = @as(ThrowTarget, @enumFromInt(i));
             const throw = ThrowParams{
                 .height = .height_5,
                 .target = target,
@@ -906,8 +906,8 @@ pub const Game = struct {
         }
         if (DEBUG_PRINTF) c.debugPrint("game setup 1");
         for (0..@typeInfo(Pane).Enum.fields.len) |i| {
-            const pane = @enumFromInt(Pane, i);
-            const fi = @floatFromInt(f32, i);
+            const pane = @as(Pane, @enumFromInt(i));
+            const fi = @as(f32, @floatFromInt(i));
             self.pane_buttons.append(.{
                 .rect = .{
                     .position = .{
@@ -916,7 +916,7 @@ pub const Game = struct {
                     },
                     .size = PANE_BUTTON_SIZE,
                 },
-                .value = @intCast(u8, @intFromEnum(pane)),
+                .value = @as(u8, @intCast(@intFromEnum(pane))),
                 .text = @tagName(pane),
             }) catch unreachable;
         }
@@ -949,7 +949,7 @@ pub const Game = struct {
                     .size = code_button_size,
                 },
                 .text = "<",
-                .value = @intCast(u8, @intFromEnum(CodeButton.move_in)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.move_in))),
             }) catch unreachable;
             self.code_buttons.append(.{
                 .rect = .{
@@ -957,14 +957,14 @@ pub const Game = struct {
                     .size = code_button_size,
                 },
                 .text = ">",
-                .value = @intCast(u8, @intFromEnum(CodeButton.move_out)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.move_out))),
             }) catch unreachable;
             self.block_buttons.append(.{
                 .rect = .{
                     .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
                     .size = BLOCK_BUTTON_SIZE,
                 },
-                .value = @intCast(u8, @intFromEnum(InstructionType.move)),
+                .value = @as(u8, @intCast(@intFromEnum(InstructionType.move))),
                 .text = "move",
             }) catch unreachable;
             if (DEBUG_PRINTF) c.debugPrint("game setup 4");
@@ -977,7 +977,7 @@ pub const Game = struct {
                     .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = "<",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_in)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.throw_in))),
             }) catch unreachable;
             self.code_buttons.append(.{
                 .rect = .{
@@ -985,7 +985,7 @@ pub const Game = struct {
                     .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = ">",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_out)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.throw_out))),
             }) catch unreachable;
             if (DEBUG_PRINTF) c.debugPrint("game setup 5");
             self.block_buttons.append(.{
@@ -993,7 +993,7 @@ pub const Game = struct {
                     .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
                     .size = BLOCK_BUTTON_SIZE.add(.{ .y = 30 }),
                 },
-                .value = @intCast(u8, @intFromEnum(InstructionType.throw)),
+                .value = @as(u8, @intCast(@intFromEnum(InstructionType.throw))),
                 .text = "throw",
             }) catch unreachable;
             y += 42;
@@ -1003,7 +1003,7 @@ pub const Game = struct {
                     .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = "v",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_low)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.throw_low))),
             }) catch unreachable;
             self.code_buttons.append(.{
                 .rect = .{
@@ -1011,7 +1011,7 @@ pub const Game = struct {
                     .size = code_button_size.add(.{ .y = -12 }),
                 },
                 .text = "^",
-                .value = @intCast(u8, @intFromEnum(CodeButton.throw_high)),
+                .value = @as(u8, @intCast(@intFromEnum(CodeButton.throw_high))),
             }) catch unreachable;
             if (DEBUG_PRINTF) c.debugPrint("game setup 6");
             y += 80;
@@ -1022,7 +1022,7 @@ pub const Game = struct {
                     .position = .{ .x = center_pane_x - (BLOCK_BUTTON_SIZE.x / 2), .y = y },
                     .size = BLOCK_BUTTON_SIZE,
                 },
-                .value = @intCast(u8, @intFromEnum(InstructionType.loop)),
+                .value = @as(u8, @intCast(@intFromEnum(InstructionType.loop))),
                 .text = "loop",
             }) catch unreachable;
         }
@@ -1104,7 +1104,7 @@ pub const Game = struct {
         for (self.block_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.command_buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.command_buttons.items) |button| {
-            if (button.clicked) self.doCommand(@enumFromInt(Command, button.value));
+            if (button.clicked) self.doCommand(@as(Command, @enumFromInt(button.value)));
         }
         self.updateMouse();
         self.updateButtonText();
@@ -1185,17 +1185,17 @@ pub const Game = struct {
                 }
                 if (mouse.l_button.is_clicked) {
                     if (active_pane) |pane_i| {
-                        const pane = @enumFromInt(Pane, pane_i);
+                        const pane = @as(Pane, @enumFromInt(pane_i));
                         self.active_pane = pane;
                         return;
                     }
                     if (active_code) |code_i| {
-                        const code = @enumFromInt(CodeButton, code_i);
+                        const code = @as(CodeButton, @enumFromInt(code_i));
                         self.triggerCodeButton(code);
                         return;
                     }
                     if (self.state.idle.block_button_index) |bbi| {
-                        const inst = @enumFromInt(InstructionType, self.block_buttons.items[bbi].value);
+                        const inst = @as(InstructionType, @enumFromInt(self.block_buttons.items[bbi].value));
                         self.cursor = .grabbing;
                         switch (inst) {
                             .move => {
@@ -1254,12 +1254,12 @@ pub const Game = struct {
                     delete_block: {
                         for (&self.program.tracks, 0..) |*track, track_index| {
                             for (track.blocks.items, 0..) |block, i| {
-                                const widthf = @floatFromInt(f32, block.width);
+                                const widthf = @as(f32, @floatFromInt(block.width));
                                 const size = Vec2{ .x = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING), .y = TRACK_HEIGHT - SLOT_PADDING * 2 };
                                 const pos = track.slots.items[block.start_index].position;
                                 const rect = Rect{ .position = pos, .size = size };
                                 if (rect.contains(mouse.current_pos)) {
-                                    self.program.deleteBlock(track_index, @intCast(u8, i));
+                                    self.program.deleteBlock(track_index, @as(u8, @intCast(i)));
                                     self.loadProgram();
                                     break :delete_block;
                                 }
@@ -1282,20 +1282,20 @@ pub const Game = struct {
                 self.state.block_drag.hovered_slot = null;
                 self.state.block_drag.hovered_track = null;
                 for (self.program.tracks, 0..) |track, i| {
-                    if (track.rect.contains(mouse.current_pos)) self.state.block_drag.hovered_track = @intCast(u8, i);
+                    if (track.rect.contains(mouse.current_pos)) self.state.block_drag.hovered_track = @as(u8, @intCast(i));
                 }
                 if (self.state.block_drag.hovered_track) |ti| {
                     const slot = self.program.getSlot(ti, mouse.current_pos, self.block.?.width);
                     if (slot.not_allowed) self.cursor = .no_drop;
                     if (slot.index) |si| {
                         self.state.block_drag.hovered_track = ti;
-                        self.state.block_drag.hovered_slot = @intCast(u8, si);
+                        self.state.block_drag.hovered_slot = @as(u8, @intCast(si));
                     }
                 }
                 if (mouse.l_button.is_released) {
                     if (self.state.block_drag.hovered_track) |ti| {
                         if (self.state.block_drag.hovered_slot) |si| {
-                            self.addBlock(data.instruction, ti, @intCast(u8, si));
+                            self.addBlock(data.instruction, ti, @as(u8, @intCast(si)));
                         }
                     }
                     self.block = null;
@@ -1331,7 +1331,7 @@ pub const Game = struct {
                 });
             }
             for (track.blocks.items) |block| {
-                const widthf = @floatFromInt(f32, block.width);
+                const widthf = @as(f32, @floatFromInt(block.width));
                 const size = Vec2{ .x = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING), .y = TRACK_HEIGHT - SLOT_PADDING * 2 };
                 const pos = track.slots.items[block.start_index].position;
                 self.haathi.drawRect(.{
@@ -1412,12 +1412,12 @@ pub const Game = struct {
             }
             if (DEBUG_PRINTF2) c.debugPrint("game render 3_3");
             {
-                const step0 = @intFromFloat(usize, hand.step_f);
+                const step0 = @as(usize, @intFromFloat(hand.step_f));
                 const step1 = step0 + 1;
                 if (step1 < NUM_SLOTS_IN_TRACK) {
                     const rect0 = track.slots.items[step0];
                     const rect1 = track.slots.items[step1];
-                    const f = hand.step_f - @floatFromInt(f32, step0);
+                    const f = hand.step_f - @as(f32, @floatFromInt(step0));
                     self.haathi.drawRect(.{
                         .position = rect0.position.lerp(rect1.position, f),
                         .size = .{ .x = 10, .y = 10 },
@@ -1548,17 +1548,17 @@ pub const Game = struct {
                 self.haathi.drawRect(.{
                     .position = button.rect.position,
                     .size = button.rect.size,
-                    .color = @enumFromInt(InstructionType, button.value).color(),
+                    .color = @as(InstructionType, @enumFromInt(button.value)).color(),
                     .radius = 2,
                 });
                 self.haathi.drawText(.{
                     .position = button.rect.center().add(.{ .y = -6 }),
-                    .color = @enumFromInt(InstructionType, button.value).textColor(),
+                    .color = @as(InstructionType, @enumFromInt(button.value)).textColor(),
                     .text = button.text,
                 });
                 self.haathi.drawText(.{
                     .position = button.rect.center().add(.{ .y = 18 }),
-                    .color = @enumFromInt(InstructionType, button.value).textColor(),
+                    .color = @as(InstructionType, @enumFromInt(button.value)).textColor(),
                     .text = button.text2,
                 });
             }
@@ -1573,7 +1573,7 @@ pub const Game = struct {
                 if (self.state.block_drag.hovered_track) |ti| {
                     if (self.state.block_drag.hovered_slot) |si| {
                         pos = self.program.tracks[ti].slots.items[si].position;
-                        const widthf = @floatFromInt(f32, block.width);
+                        const widthf = @as(f32, @floatFromInt(block.width));
                         const block_width = (widthf * SLOT_WIDTH) + ((widthf - 1) * SLOT_PADDING);
                         size = Vec2{ .x = block_width, .y = TRACK_HEIGHT - (2 * 3) };
                         centered = false;
