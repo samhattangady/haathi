@@ -662,3 +662,14 @@ frames and scaling. We also need to add support for drawing sprites and
 playing sounds...
 
 Okay lets do the design thing.
+
+---
+
+01 Aug 2023:
+lol i did nothing yesterday. No worries. lets start today. what is the thing
+though?i like the idea of having a cable. pushing around furniture. I think I
+would like to have just one level. not multiple. in most cases, that means
+breaking up the level into different parts. Which is something that we can do
+I think.
+
+Okay, let's just start off with a grid then? and then see where it goes?
