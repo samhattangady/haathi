@@ -6,7 +6,7 @@ const Frame = helpers.Frame;
 const Vec2 = helpers.Vec2;
 const TYPING_BUFFER_SIZE = 16;
 
-const Key = enum {
+pub const Key = enum {
     const Self = @This();
     space,
     alt,
@@ -21,6 +21,7 @@ const Key = enum {
     backspace,
     delete,
     escape,
+    meta,
     a,
     b,
     c,

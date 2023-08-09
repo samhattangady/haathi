@@ -673,3 +673,128 @@ breaking up the level into different parts. Which is something that we can do
 I think.
 
 Okay, let's just start off with a grid then? and then see where it goes?
+
+---
+
+07 Aug 2023:
+It's a new day and a new jam. I have the idea to make a game about holi.
+Basically, the high level concpet is that it is holi, and all the kids have
+holiday, but you work at a startup, and your boss has said that you need to
+report for work. So your job is to navigate through various alleys and avoid
+the kids. Something like a reversed tower defense.
+I like the idea that mechanically, the game is some kind of a card builder. So
+movement and everything is dictated by that. In all its more of avoidance,
+false triggerring, self shielding and things of that nature.
+One more thing that I want to add to that is scaling. Over the course of
+building a deck, I want there to be a few stratergies and synergies that the
+player can pursue. I dont really know what that would be though... Maybe one
+built around movement, one around defense, one around hiding, and things along
+those lines.
+In the ideation and things we need to figure out how the cards would need to
+be designed to facilitate that kind of scaling. Cool, but first we need to get
+some of the basic things set up I think,
+
+Okay, so then now we have to figure out what is the first thing that we start
+off with. Lets make a grid. Pkay, now we set up all the things to make it work
+on this system... Now we need to actually start working...
+
+One more question that we need to spend some time thinking about is whether we
+want it to be more tower defense style or whether we want it to be more
+tactical... Considering that we have just the one controllable character, both
+of those things would probably be the same...
+
+Other ideas for cards:
+route optimisation - rather than using the full height, you can reduce that by
+a few.
+
+Okay, we have the basic stuff of path generation complete. I think we should
+also have the movement done. Lets see that.
+
+The thing that we now need to figure out is, what are enemies? How to
+implement? ACtually once we break it down to that level, it doesnt sound that
+hard, but still feels kinda intimidating...
+
+So each "tower" would have a certain range, and do a certain amount of damage.
+I think I like the concept of having different types of damage. Not just
+direct HP stuff. Basically, if you have a water balloon, you would want to
+deal with it differently than if you had pichkari or hose, or just colors...
+
+Or maybe today would make more sense to sit and ideate some more.
+
+So what are the different kind of defences that we have? We want one spook
+based, where we send a dog / something else in first, and the water / color is
+wasted. 
+Something umbrella based.
+I want something mummy based also, that if you spot the kid, you can threaten
+to call his mum, and then he gets spooked and doesnt hose you.
+Shelter based? where you can take shelter behind some old man or something
+like that? But then how would that work? WOuld they always be hanging around
+or do we call them or what?
+
+I think at a system level we need to figure out what are the different
+orthogonal factors that each tower has that we can exhaust.
+
+turn off the water connection?
+
+All of this is becoming more thinky puzzle, but thats not what we want. we
+want something more systems based that scales and allows problems to be solved
+in multiple ways. thats the goal.
+
+maybe the movement should not be card based. instead every turn, we move a
+fixed distance, and then based on the cards, that can be manipulated. move
+more less etc.
+
+We could also flip the whole thing around? And make it actual tower defense?
+How would the card system work then?
+That actually might work out? Would be a lot more classical, and allow us to
+actually try out the card based things, rather than working out all the
+avoidance mechanics even though that is far more satisfying narratively and
+such.
+
+Maybe tower defense isnt even the best way. Just have like an output of some
+sort. Like water balloons created.
+After some point it feels like the non-violent thing is just in spirit alone,
+and its a cheap reskin, but I think for now atleast, I am okay with something
+like that...
+
+Can we move away from the holi theme as well then?
+
+Or should we just go aehad with ten pin phalanx? That might be a better thing
+to go ahead with.
+
+---
+
+08 Aug 2023:
+I think it was supposed to be called phalanx pin bowling. but lets go. The
+main idea here is a balance between scoring and earning. So the idea is that
+you are playing a bowling game as the bowling pins. Your currency is related
+to the actual bowling score, while your score is related to the number of pins
+still standing.
+
+Right now I think I have way too may ideas that are very nebulous. I think
+that the best thing to do would actually be to just get started. Lol. But then
+why is this procrastination stuff so much easier to do then?
+
+We would also need to figure out how more pins would fall. If we want the game
+to have any element of strategy, then we need to be able to communicate the
+system via which the pins fall. Hell, even if we just want to implement the
+damn thing, we need to have an idea of how it would fall.
+
+So lets say that if a ball hits a shield, it stops immediately. So then the
+only falling will be done by the pins...
+
+So let a pin fall just in the direction that it was tipped from, so there
+would potentially be any number of more pins in that direction, which would
+work. Again this is all trending in a more thinky puzzly direction.
+
+Lets go back to the theme and see if we can figure out something that has the
+same aspect of scoring v losing. Or no. Lets stick on this. I think we can
+still make it work.
+
+So we need to have a system such that yeah I think it should work decently.
+Basically think of the whole pyramid as a successive series of diagonals. So
+the ball hits pin 1 and 2, which trigger their own diagonals, then, the ball
+hits the remaining 3 pin pyramid at the exact same spot, and the same thing
+continues.
+
+Damn. I'm a little confused again.

@@ -1,6 +1,7 @@
 const std = @import("std");
 const c = @import("interface.zig");
 const Inputs = @import("inputs.zig").Inputs;
+const Key = @import("inputs.zig").Key;
 const colors = @import("colors.zig");
 
 const helpers = @import("helpers.zig");
@@ -56,8 +57,6 @@ pub const CursorStyle = enum {
 /// passes them on.
 pub const Haathi = struct {
     const Self = @This();
-    space_down: bool = false,
-    mouse_down: bool = true,
     inputs: Inputs = .{},
     ticks: u64 = 0,
     drawables: std.ArrayList(Drawable),
@@ -81,19 +80,15 @@ pub const Haathi = struct {
     }
 
     pub fn keyDown(self: *Self, code: u32) void {
-        if (code == 0) self.space_down = true;
         self.inputs.handleKeyDown(code, self.ticks);
     }
     pub fn keyUp(self: *Self, code: u32) void {
-        if (code == 0) self.space_down = false;
         self.inputs.handleKeyUp(code, self.ticks);
     }
     pub fn mouseDown(self: *Self, code: c_int) void {
-        self.mouse_down = true;
         self.inputs.handleMouseDown(code, self.ticks);
     }
     pub fn mouseUp(self: *Self, code: c_int) void {
-        self.mouse_down = false;
         self.inputs.handleMouseUp(code, self.ticks);
     }
     pub fn mouseMove(self: *Self, x: c_int, y: c_int) void {

@@ -70,7 +70,7 @@ pub fn main() !void {
         // bmp.data = c.stbtt_GetCodepointSDF(&font_info, scale, @intCast(i32, codepoint), 1, 1, 1, &bmp.width, &bmp.height, &bmp.xoff, &bmp.yoff);
         var advance: i32 = undefined;
         c.stbtt_GetCodepointHMetrics(&font_info, @intCast(i32, codepoint), &advance, 0);
-        bmp.xadvance = @intToFloat(f32, advance) * scale;
+        bmp.xadvance = @floatFromInt(f32, advance) * scale;
         bitmaps.put(codepoint, bmp) catch unreachable;
     }
     // pack all the rects within a texture
@@ -99,7 +99,7 @@ pub fn main() !void {
         }
         _ = c.stbrp_init_target(&packer_context, FONT_TEX_WIDTH, FONT_TEX_HEIGHT, &nodes.items[0], @intCast(i32, nodes.items.len));
         var was_packed = c.stbrp_pack_rects(&packer_context, &rects.items[0], @intCast(i32, rects.items.len));
-        if (was_packed == 0) {}//std.debug.print("Could not pack rects \n", .{});
+        if (was_packed == 0) {} //std.debug.print("Could not pack rects \n", .{});
     }
     var font_bitmap = gpa.allocator().alloc(u8, FONT_TEX_WIDTH * FONT_TEX_HEIGHT) catch unreachable;
     defer gpa.allocator().free(font_bitmap);
@@ -154,9 +154,9 @@ pub fn main() !void {
             try js.beginObject();
             {
                 try js.objectField("x0");
-                try js.emitNumber(@intToFloat(f32, rect.x) / FONT_TEX_WIDTH);
+                try js.emitNumber(@floatFromInt(f32, rect.x) / FONT_TEX_WIDTH);
                 try js.objectField("y0");
-                try js.emitNumber(@intToFloat(f32, rect.y) / FONT_TEX_HEIGHT);
+                try js.emitNumber(@floatFromInt(f32, rect.y) / FONT_TEX_HEIGHT);
                 try js.objectField("w");
                 try js.emitNumber(rect.w - PADDING);
                 try js.objectField("h");

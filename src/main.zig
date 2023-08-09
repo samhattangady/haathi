@@ -8,6 +8,7 @@ const Game = switch (build_options.game) {
     .drifter => @import("drifter.zig").Game,
     .juggler => @import("juggler.zig").Game,
     .charger => @import("charger.zig").Game,
+    .holiday => @import("holiday.zig").Game,
 };
 const helpers = @import("helpers.zig");
 
