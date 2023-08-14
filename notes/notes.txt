@@ -803,4 +803,77 @@ Damn. I'm a little confused again.
 
 09 Aug 2023:
 Was travelling today. Just want to update to the newest zig version right now
+
 though. I think that would be enough to do for today.
+
+---
+
+10 Aug 2023:
+Okay, now we back. So lets make this happen. What is the thing to work on? I
+think we need to get the scoring system working. Then the reset pins. Then the
+effects. Lot of things there. But it will all build on top of one another.
+Lets start off with the reset and scoring and frames and things like that.
+
+There is a question here about whether we want ot contuinue on with that idea
+we had of having the two separate scoring things. I still like the concept of
+one of the effects being to spawn more pins. But whether we want that or not
+is another thing.
+
+I think for now it is better to go with it. We can possibly reverse the
+functions. Let the standing pins be the currency, and the score be the score.
+
+Aah, this is a little confusing overall for me because I am trying to get the
+damn thing to work, and every struct I put in place seems to allow some sort
+of powerup and that makes this all so hard. Okay. Start off with a standard
+bowling scorecard, and let the rest happen later.
+
+Whats the better way to do the ball position address stuff? I think I dont
+like the bounciness of the ball. It should ideally just move straight, and
+knock down the pins as it moves. So I think we should just have a x id for the
+ball, and then let it move down on each thing.
+
+NEXT: Get the scorecard updated and working.
+
+Cool thats done. Now we have to figure out how we want to apply the effects
+and things. Do we want to apply directly on the pins?
+Actually there are some that might be better to put on the pins directly (like
+shield) and for others?
+No but the thing is that if we have an effect like can only be knocked over by
+pin, then we would have to store that somewhere else. Maybe its best to have
+all effects be externally stored.
+
+Okay, we have the basic shield working. There are a lot of other things that
+would need to be implemented ofcourse, but for now, we need to figure out some
+workflow stuff as well.
+
+---
+
+14 Aug 2023:
+Missed a day or two there. But thats okay. Lets make this all happen here
+today and this week. It's all good sam
+
+So what should we be doing now? I think the correct answer is to step back and
+analyse and see. But that sounds scary and is more likely to result in things
+not going our way. So then what is the best thing to do?
+
+Lets get the scoring working. And then the full frame reset.
+
+I like the idea of having a scorecard with 3 bowlers. And the final score is
+all three of their scores combined or something like that. And then even the
+store or whatever can come between the frames, rather than at any other
+time...
+
+And each of the bowlers will have a different way to get currency. Actually I
+think it is a good idea, but it's a bit richer than I'd like.
+
+So lets simplify. Before every frame, you get to optionally buy  1 gamelong effect, and
+select 3 framelong effects. Those effects can either be played immediately or
+hung onto.
+
+Calm down sam. You're getting very scared and overwhelmed. That's okay. Take a
+few deep breaths. This is all just a game. Allow the emotions to pass through
+you, and just remember that none of this is particularly important in the
+grander schemes.
+
+So we need to create all the ideas for the things. First lets get the
+scoreboard display implemented.
