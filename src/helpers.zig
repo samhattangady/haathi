@@ -259,6 +259,7 @@ pub const Button = struct {
     value: u8,
     text: []const u8,
     text2: []const u8 = "",
+    enabled: bool = true,
     // mouse is hovering over button
     hovered: bool = false,
     // the frame that mouse button was down in bounds
@@ -273,10 +274,17 @@ pub const Button = struct {
     }
 
     pub fn update(self: *Self, mouse: MouseState) void {
-        self.hovered = !mouse.l_button.is_down and self.contains(mouse.current_pos);
-        self.clicked = mouse.l_button.is_clicked and self.contains(mouse.current_pos);
-        self.released = mouse.l_button.is_released and self.contains(mouse.current_pos) and self.contains(mouse.l_down_pos);
-        self.triggered = mouse.l_button.is_down and self.contains(mouse.l_down_pos);
+        if (self.enabled) {
+            self.hovered = !mouse.l_button.is_down and self.contains(mouse.current_pos);
+            self.clicked = mouse.l_button.is_clicked and self.contains(mouse.current_pos);
+            self.released = mouse.l_button.is_released and self.contains(mouse.current_pos) and self.contains(mouse.l_down_pos);
+            self.triggered = mouse.l_button.is_down and self.contains(mouse.l_down_pos);
+        } else {
+            self.hovered = false;
+            self.clicked = false;
+            self.released = false;
+            self.triggered = false;
+        }
     }
 };
 

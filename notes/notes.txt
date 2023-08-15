@@ -882,3 +882,21 @@ Okay, the scroecard stuff is done. Now we need the list of abilities and
 stuffs. Lets implement one, where on the second shot, we have a 2x score
 multiplier. So there is now the question how to store and calculate that
 one...
+
+---
+
+15 Aug 2023:
+Okay, we need to start off with adding the frame effects UI stuffs. Let's go.
+So how do we want to do? I think before every frame, we need to pop up a box
+or whatever, and then you click on the ones that you want. So lets have some
+kind of radio button kinda things? Cool.
+
+The basic interface is now set up. Next we would need to figure out how to add
+the effects into the scoring system. I think that we should have the effects
+listed in each frame and in the game. Okay. Basic stuffs set up.
+
+Okay, so lets try to get some more stuff up now. What else is there? I don't
+think we can get everything working, and then get to content, I think it just
+has to go hand in hand. So lets do that.
+
+Things to add: adding frames mid game?
