@@ -24,7 +24,8 @@ const SIM_TICK = 100;
 const NUM_EXTRA_SIM_STEPS = 5;
 const PIN_SPACING = 60; // pins are placed in equilateral triangles.
 const NUM_EFFECTS = @typeInfo(EffectType).Enum.fields.len;
-const DEBUG_PRINT_1 = true;
+const DEBUG_PRINT_1 = false;
+const HEAD_PIN_POSITION = Vec2{ .x = SCREEN_SIZE.x * 0.25, .y = SCREEN_SIZE.y * 0.5 };
 
 const Pin = struct {
     const Self = @This();
@@ -38,7 +39,8 @@ const Pin = struct {
     // and so on.
     address: Vec2i,
     present: bool = true,
-    fallen: bool = false,
+    fallen_dir: ?Vec2i = null,
+    just_fallen: bool = true,
 
     pub fn init(address: Vec2i, num_rows: usize) Self {
         var self = Self{ .address = address };
@@ -50,14 +52,19 @@ const Pin = struct {
         _ = num_rows; // TODO (08 Aug 2023): Use for scaling.
         const x_padding = PIN_SPACING * 0.5;
         const y_padding = PIN_SPACING * @cos(std.math.pi / 6.0);
-        const origin = SCREEN_SIZE.scale(0.5);
+        const origin = HEAD_PIN_POSITION;
         self.position.x = origin.x + (x_padding * @as(f32, @floatFromInt(self.address.x)));
         self.position.y = origin.y - (y_padding * @as(f32, @floatFromInt(self.address.y)));
     }
 
     pub fn reset(self: *Self) void {
         self.present = true;
-        self.fallen = false;
+        self.fallen_dir = null;
+        self.just_fallen = true;
+    }
+
+    pub fn fallen(self: *const Self) bool {
+        return self.fallen_dir != null;
     }
 };
 
@@ -211,6 +218,14 @@ const Effect = struct {
     pin_index: usize,
 };
 
+const FrameEffectType = enum {
+    /// multiply pins fallen by the nth roll
+    num_scale,
+};
+const FrameEffect = struct {
+    effect: FrameEffectType,
+};
+
 const Phalanx = struct {
     const Self = @This();
     pins: std.ArrayList(Pin),
@@ -218,6 +233,7 @@ const Phalanx = struct {
     queue: std.ArrayList(Dropper),
     effects: std.ArrayList(Effect),
     scorecard: Scorecard,
+    frame_effects: std.ArrayList(FrameEffect),
     active_frame: u8 = 0,
     frame_num_shot: u8 = 0,
     ticks: u64 = 0,
@@ -238,6 +254,7 @@ const Phalanx = struct {
             .drops = std.ArrayList(PinDrop).init(allocator),
             .queue = std.ArrayList(Dropper).init(allocator),
             .effects = std.ArrayList(Effect).init(allocator),
+            .frame_effects = std.ArrayList(FrameEffect).init(allocator),
             .scorecard = Scorecard.init(allocator),
             .allocator = allocator,
         };
@@ -299,6 +316,7 @@ const Phalanx = struct {
     }
 
     fn throwBall(self: *Self) void {
+        if (self.active_frame >= self.total_num_frames) return;
         if (self.simming) return;
         self.sim_generation = 0;
         self.queue.clearRetainingCapacity();
@@ -342,7 +360,7 @@ const Phalanx = struct {
                     .shield => return false,
                 }
             }
-            self.pins.items[pin_index].fallen = true;
+            self.pins.items[pin_index].fallen_dir = direction;
             const fall = PinDrop{ .index = pin_index, .prev = prev, .gen = self.sim_generation };
             self.drops.append(fall) catch unreachable;
             self.queue.append(.{
@@ -359,10 +377,11 @@ const Phalanx = struct {
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 1");
         var score: u16 = 0;
         for (self.pins.items) |pin| {
-            if (pin.fallen and pin.present) score += 1;
+            if (pin.fallen() and pin.present) score += 1;
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 2");
         const cleared = self.allPinsFallen();
+        score = self.applyFrameScoreEffects(score);
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 2.1");
         self.scorecard.frames.items[self.active_frame].shots.append(score) catch unreachable;
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 2.2");
@@ -373,7 +392,10 @@ const Phalanx = struct {
         self.frame_num_shot += 1;
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 3");
         for (self.pins.items) |*pin| {
-            if (pin.fallen) pin.present = false;
+            if (pin.fallen()) {
+                pin.present = false;
+                pin.just_fallen = false;
+            }
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 4");
         var goto_next_frame = false;
@@ -405,10 +427,21 @@ const Phalanx = struct {
             self.scorecard.frames.items[self.active_frame].complete = true;
             self.active_frame += 1;
             self.frame_num_shot = 0;
+            self.frame_effects.clearRetainingCapacity();
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 8");
         self.scorecard.calculateScores();
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 9");
+    }
+
+    fn applyFrameScoreEffects(self: *Self, start: u16) u16 {
+        var score = start;
+        for (self.frame_effects.items) |effect| {
+            switch (effect.effect) {
+                .num_scale => score *= self.frame_num_shot,
+            }
+        }
+        return score;
     }
 
     /// does not handle final frame. that's done elsewhere
@@ -420,18 +453,25 @@ const Phalanx = struct {
 
     fn allPinsFallen(self: *const Self) bool {
         for (self.pins.items) |pin| {
-            if (!pin.fallen) return false;
+            if (!pin.fallen()) return false;
         }
         return true;
     }
 
     fn standingPinAt(self: *Self, address: Vec2i) ?usize {
         for (self.pins.items, 0..) |pin, i| {
-            if (pin.fallen) continue;
+            if (pin.fallen()) continue;
             if (pin.address.equal(address)) return i;
         }
         return null;
     }
+};
+
+const FrameCard = struct {
+    const Self = @This();
+    position: Vec2,
+    size: Vec2,
+    effect: FrameEffect,
 };
 
 const StateData = union(enum) {
@@ -452,6 +492,7 @@ pub const Game = struct {
     state: StateData = .{ .idle = .{} },
     phalanx: Phalanx,
     buttons: std.ArrayList(Button),
+    frame_cards: std.ArrayList(FrameCard),
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -569,21 +610,26 @@ pub const Game = struct {
             });
         }
         for (self.phalanx.pins.items) |pin| {
+            const pin_color = if (pin.fallen()) colors.endesga_grey2 else colors.endesga_grey4;
             self.haathi.drawRect(.{
                 .position = pin.position,
                 .size = .{ .x = pin.size, .y = pin.size },
-                .color = colors.endesga_grey2,
+                .color = pin_color,
                 .centered = true,
                 .radius = pin.size,
             });
-            if (pin.fallen) {
-                self.haathi.drawRect(.{
-                    .position = pin.position,
-                    .size = .{ .x = pin.size, .y = pin.size },
-                    .color = colors.endesga_grey4,
-                    .centered = true,
-                    .radius = pin.size,
-                });
+            if (pin.just_fallen) {
+                if (pin.fallen_dir) |dir| {
+                    const xdir: f32 = @floatFromInt(dir.x);
+                    var points = self.arena.alloc(Vec2, 3) catch unreachable;
+                    points[0] = pin.position.add(.{ .x = -pin.size * 0.5, .y = xdir * -pin.size * 0.5 * @cos(std.math.pi / 6.0) });
+                    points[1] = pin.position.add(.{ .x = pin.size * 0.5, .y = xdir * pin.size * 0.5 * @cos(std.math.pi / 6.0) });
+                    points[2] = pin.position.add(.{ .x = xdir * PIN_SPACING * 0.5, .y = -PIN_SPACING * @cos(std.math.pi / 6.0) });
+                    self.haathi.drawPoly(.{
+                        .points = points,
+                        .color = colors.endesga_grey3,
+                    });
+                }
             }
             if (false) {
                 const pin_pos = std.fmt.allocPrintZ(self.arena, "{d},{d}", .{ pin.address.x, pin.address.y }) catch unreachable;
@@ -608,21 +654,6 @@ pub const Game = struct {
                     .text = ball_pos,
                     .position = self.phalanx.ball.position.add(.{ .y = 6 }),
                     .color = colors.endesga_grey0,
-                });
-            }
-        }
-        const SCORECARD_PADDING = 50;
-        for (self.phalanx.scorecard.frames.items, 0..) |frame, i| {
-            const fi: f32 = @floatFromInt(i);
-            const y = (fi + 1) * SCORECARD_PADDING;
-            for (frame.shots.items, 0..) |score, j| {
-                const fj: f32 = @floatFromInt(j);
-                const x = (SCREEN_SIZE.x * 0.8) + (fj * SCORECARD_PADDING);
-                const score_text = std.fmt.allocPrintZ(self.arena, "{d}", .{score}) catch unreachable;
-                self.haathi.drawText(.{
-                    .text = score_text,
-                    .position = .{ .x = x, .y = y },
-                    .color = colors.endesga_grey4,
                 });
             }
         }

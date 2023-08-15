@@ -877,3 +877,8 @@ grander schemes.
 
 So we need to create all the ideas for the things. First lets get the
 scoreboard display implemented.
+
+Okay, the scroecard stuff is done. Now we need the list of abilities and
+stuffs. Lets implement one, where on the second shot, we have a 2x score
+multiplier. So there is now the question how to store and calculate that
+one...
