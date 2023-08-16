@@ -59,16 +59,15 @@ const Pin = struct {
     fallen_dir: ?Vec2i = null,
     just_fallen: bool = true,
 
-    pub fn init(address: Vec2i, num_rows: usize) Self {
+    pub fn init(address: Vec2i, pin_scale: f32) Self {
         var self = Self{ .address = address };
-        self.setPosition(num_rows);
+        self.setPosition(pin_scale);
         return self;
     }
 
-    pub fn setPosition(self: *Self, num_rows: usize) void {
-        _ = num_rows; // TODO (08 Aug 2023): Use for scaling.
-        const x_padding = PIN_SPACING * 0.5;
-        const y_padding = PIN_SPACING * @cos(std.math.pi / 6.0);
+    pub fn setPosition(self: *Self, pin_scale: f32) void {
+        const x_padding: f32 = pin_scale * PIN_SPACING * 0.5;
+        const y_padding: f32 = pin_scale * PIN_SPACING * @cos(std.math.pi / 6.0);
         const origin = HEAD_PIN_POSITION;
         self.position.x = origin.x + (x_padding * @as(f32, @floatFromInt(self.address.x)));
         self.position.y = origin.y - (y_padding * @as(f32, @floatFromInt(self.address.y)));
@@ -242,42 +241,123 @@ const Scorecard = struct {
     }
 };
 
+const RewardType = enum {
+    multiplier,
+    extra_frame,
+    extra_pins,
+};
+const REWARD_TYPE_COUNT = @typeInfo(RewardType).Enum.fields.len;
+const Reward = struct {
+    reward: RewardType,
+    value: f32,
+};
+
+fn randomQuestReward(frame_reward: bool, rng: std.rand.Random) Reward {
+    _ = frame_reward;
+    const reward: RewardType = @enumFromInt(rng.uintLessThan(u8, REWARD_TYPE_COUNT));
+    return .{
+        .reward = reward,
+        .value = 1,
+    };
+}
+
 const ScoreEffectType = enum {
     const Self = @This();
     /// multiply pins fallen by the nth roll
     num_scale,
     /// double pin value
     double_pin,
-    /// shield
+    /// on all rolls, knock down an equal number of pins.
+    equal_score,
+    /// shield - extra effect, not frame long or game long.
     shield,
 
     /// this kind of effect is applied directly to a pin
     pub fn pinSpecific(self: *const Self) bool {
         return switch (self.*) {
-            .num_scale => false,
-            .shield, .double_pin => true,
+            .num_scale,
+            .equal_score,
+            => false,
+            .shield,
+            .double_pin,
+            => true,
         };
     }
 
     pub fn compulsory(self: *const Self) bool {
         return switch (self.*) {
-            .num_scale => false,
-            .shield => false,
+            .num_scale,
+            .shield,
+            .equal_score,
+            => false,
             .double_pin => true,
         };
     }
 
     pub fn isGameLong(self: *const Self) bool {
         return switch (self.*) {
-            .num_scale => false,
-            .shield => true,
+            .num_scale,
+            .equal_score,
+            .shield,
+            => false,
             .double_pin => true,
         };
     }
+
+    pub fn isFrameLong(self: *const Self) bool {
+        return switch (self.*) {
+            .num_scale,
+            .equal_score,
+            => true,
+            .double_pin,
+            .shield,
+            => false,
+        };
+    }
+
+    pub fn isQuest(self: *const Self) bool {
+        return switch (self.*) {
+            .equal_score => true,
+            .num_scale,
+            .shield,
+            .double_pin,
+            => false,
+        };
+    }
 };
+const NUM_SCORE_EFFECTS = @typeInfo(ScoreEffectType).Enum.fields.len;
+
+/// at comptime, we want to make lists of all the effects that we will later be randomly selecting from
+fn sortEffects(frame_long: bool, game_long: bool, is_quest: ?bool, buffer: *[NUM_SCORE_EFFECTS]ScoreEffectType) []ScoreEffectType {
+    var i: usize = 0;
+    for (0..NUM_SCORE_EFFECTS) |sc| {
+        const effect: ScoreEffectType = @enumFromInt(sc);
+        if ((frame_long and effect.isFrameLong()) or (game_long and effect.isGameLong())) {
+            if (is_quest) |iq| {
+                const effect_is_quest = effect.isQuest();
+                if (effect_is_quest == iq) {
+                    buffer[i] = effect;
+                    i += 1;
+                }
+                continue;
+            } else {
+                buffer[i] = effect;
+                i += 1;
+            }
+        }
+    }
+    return buffer[0..i];
+}
+var game_effect_buffer: [NUM_SCORE_EFFECTS]ScoreEffectType = undefined;
+var frame_effect_buffer: [NUM_SCORE_EFFECTS]ScoreEffectType = undefined;
+// TODO (16 Aug 2023 sam): This should all be comptime. But wasn't working.
+var GAME_EFFECTS: []ScoreEffectType = undefined;
+var FRAME_EFFECTS: []ScoreEffectType = undefined;
+
 const ScoreEffect = struct {
     effect: ScoreEffectType,
     index: ?usize = null,
+    reward: ?Reward = null,
 };
 
 const Phalanx = struct {
@@ -289,6 +369,7 @@ const Phalanx = struct {
     score_effects: std.ArrayList(ScoreEffect),
     active_frame: u8 = 0,
     frame_num_shot: u8 = 0,
+    num_pin_rows: usize = 0,
     ticks: u64 = 0,
     sim_generation: usize = 0,
     total_num_frames: usize = 4,
@@ -303,6 +384,7 @@ const Phalanx = struct {
     total_score: usize = 0,
     multiplier: f32 = 1,
     can_throw: bool = false,
+    pin_scale: f32 = 1,
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
 
@@ -330,27 +412,28 @@ const Phalanx = struct {
 
     fn setup(self: *Self) void {
         // setup 4 rows.
-        const addresses = [_]Vec2i{
-            .{ .x = 0, .y = 0 },
-            .{ .x = -1, .y = 1 },
-            .{ .x = 1, .y = 1 },
-            .{ .x = -2, .y = 2 },
-            .{ .x = 0, .y = 2 },
-            .{ .x = 2, .y = 2 },
-            .{ .x = -3, .y = 3 },
-            .{ .x = -1, .y = 3 },
-            .{ .x = 1, .y = 3 },
-            .{ .x = 3, .y = 3 },
-            // .{ .x = -4, .y = 4 },
-            // .{ .x = -2, .y = 4 },
-            // .{ .x = 0, .y = 4 },
-            // .{ .x = 2, .y = 4 },
-            // .{ .x = 4, .y = 4 },
-        };
-        for (addresses) |adr| {
-            const pin = Pin.init(adr, 4);
-            self.pins.append(pin) catch unreachable;
-        }
+        // const addresses = [_]Vec2i{
+        //     .{ .x = 0, .y = 0 },
+        //     .{ .x = -1, .y = 1 },
+        //     .{ .x = 1, .y = 1 },
+        //     .{ .x = -2, .y = 2 },
+        //     .{ .x = 0, .y = 2 },
+        //     .{ .x = 2, .y = 2 },
+        //     .{ .x = -3, .y = 3 },
+        //     .{ .x = -1, .y = 3 },
+        //     .{ .x = 1, .y = 3 },
+        //     .{ .x = 3, .y = 3 },
+        //     // .{ .x = -4, .y = 4 },
+        //     // .{ .x = -2, .y = 4 },
+        //     // .{ .x = 0, .y = 4 },
+        //     // .{ .x = 2, .y = 4 },
+        //     // .{ .x = 4, .y = 4 },
+        // };
+        // for (addresses) |adr| {
+        //     const pin = Pin.init(adr, 4);
+        //     self.pins.append(pin) catch unreachable;
+        // }
+        for (0..4) |_| self.addPinRow();
         for (0..self.total_num_frames) |_| {
             var frame = Frame.init(self.allocator);
             self.scorecard.frames.append(frame) catch unreachable;
@@ -391,7 +474,9 @@ const Phalanx = struct {
             .shield => {
                 self.score_effects.items[effect_index].index = pin_index;
             },
-            .num_scale => {},
+            .num_scale,
+            .equal_score,
+            => {},
         }
     }
 
@@ -427,7 +512,7 @@ const Phalanx = struct {
 
     fn changeBallCol(self: *Self, change: i8) void {
         self.ball_col += change;
-        self.ball_col = std.math.clamp(self.ball_col, -5, 4);
+        self.ball_col = std.math.clamp(self.ball_col, -1 * @as(i8, @intCast(self.num_pin_rows)), @as(i8, @intCast(self.num_pin_rows)));
         self.resetBall();
     }
 
@@ -444,8 +529,8 @@ const Phalanx = struct {
 
     fn setBallPosition(self: *Self) void {
         const pin_address = Vec2i{ .x = self.ball.col, .y = self.ball.row };
-        const pin = Pin.init(pin_address, 4);
-        self.ball.position = pin.position.add(.{ .x = PIN_SPACING / 4, .y = 25 });
+        const pin = Pin.init(pin_address, self.pin_scale);
+        self.ball.position = pin.position.add(.{ .x = self.pin_scale * PIN_SPACING / 4, .y = self.pin_scale * 25 });
     }
 
     fn simulationStep(self: *Self) void {
@@ -462,7 +547,7 @@ const Phalanx = struct {
         self.sim_generation += 1;
         self.ball.row += 1;
         self.setBallPosition();
-        if (self.ball.row > 3 and self.sim_generation - self.last_ball_hit > NUM_EXTRA_SIM_STEPS) {
+        if (self.ball.row > self.num_pin_rows + 2) {
             self.resetBall();
             self.simming = false;
             self.updateScorecard();
@@ -481,6 +566,7 @@ const Phalanx = struct {
                     },
                     .double_pin,
                     .num_scale,
+                    .equal_score,
                     => {},
                 }
             }
@@ -549,10 +635,10 @@ const Phalanx = struct {
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 7");
         if (goto_next_frame) {
             self.scorecard.frames.items[self.active_frame].complete = true;
+            self.checkQuests();
+            self.clearFrameEffects();
             self.active_frame += 1;
             self.frame_num_shot = 0;
-            // TODO (15 Aug 2023 sam): check if frame quests are complete.
-            self.clearFrameEffects();
             self.frame_just_complete = true;
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 8");
@@ -563,10 +649,49 @@ const Phalanx = struct {
         }
     }
 
+    fn checkQuests(self: *Self) void {
+        for (self.score_effects.items) |effect| {
+            if (!effect.effect.isQuest()) continue;
+            switch (effect.effect) {
+                .equal_score => {
+                    const num_shots_taken = self.frame_num_shot;
+                    if (num_shots_taken == 1) continue;
+                    var all_same = true;
+                    const frame = self.scorecard.frames.items[self.active_frame];
+                    const first_shot = frame.shots.items[0];
+                    for (1..num_shots_taken) |shot_index| {
+                        if (frame.shots.items[shot_index] != first_shot) {
+                            all_same = false;
+                            break;
+                        }
+                    }
+                    if (all_same) self.applyReward(effect.reward.?);
+                },
+                .num_scale,
+                .shield,
+                .double_pin,
+                => {},
+            }
+        }
+    }
+
+    fn applyReward(self: *Self, reward: Reward) void {
+        // TODO (16 Aug 2023 sam): check the value in reward.
+        switch (reward.reward) {
+            .multiplier => {},
+            .extra_pins => {
+                self.addPinRow();
+            },
+            .extra_frame => {
+                self.addFrame();
+            },
+        }
+    }
+
     fn clearFrameEffects(self: *Self) void {
         var i = self.score_effects.items.len - 1;
         while (true) : (i -= 1) {
-            if (!self.score_effects.items[i].effect.isGameLong()) _ = self.score_effects.orderedRemove(i);
+            if (self.score_effects.items[i].effect.isFrameLong()) _ = self.score_effects.orderedRemove(i);
             if (i == 0) break;
         }
         self.score_effects.items[0].index = null;
@@ -578,12 +703,25 @@ const Phalanx = struct {
         self.scorecard.frames.append(frame) catch unreachable;
     }
 
+    fn addPinRow(self: *Self) void {
+        var x: i32 = -1 * @as(i32, @intCast(self.num_pin_rows));
+        while (x <= self.num_pin_rows) : (x += 2) {
+            const address = Vec2i{ .x = x, .y = @intCast(self.num_pin_rows + 1) };
+            const pin = Pin.init(address, self.pin_scale);
+            self.pins.append(pin) catch unreachable;
+        }
+        self.num_pin_rows += 1;
+        self.pin_scale = if (self.num_pin_rows > 6) std.math.pow(f32, 0.9, @as(f32, @floatFromInt(self.num_pin_rows - 6))) else 1;
+        for (self.pins.items) |*pin| pin.setPosition(self.pin_scale);
+    }
+
     fn applyFrameScoreEffects(self: *Self, start: usize) usize {
         var score = start;
         for (self.score_effects.items) |effect| {
             switch (effect.effect) {
                 .num_scale => score *= (self.frame_num_shot + 1),
                 .double_pin,
+                .equal_score,
                 .shield,
                 => {},
             }
@@ -651,7 +789,6 @@ const SelectEffects = struct {
 
     pub fn randomiseSelection(self: *Self, seed: u64) void {
         var rng = std.rand.DefaultPrng.init(seed);
-        _ = rng;
         self.cards.clearRetainingCapacity();
         self.effects.clearRetainingCapacity();
         {
@@ -666,6 +803,8 @@ const SelectEffects = struct {
                     .x = cards_x_offset + (fi * (CARD_SIZE.x + CARD_PADDING)),
                     .y = CARDS_Y_OFFSET + (row * (CARD_SIZE.y + CARD_PADDING)),
                 };
+                const effect = FRAME_EFFECTS[rng.random().uintLessThan(usize, FRAME_EFFECTS.len)];
+                const reward = if (effect.isQuest()) randomQuestReward(true, rng.random()) else null;
                 self.cards.append(.{
                     .button = .{
                         .rect = .{
@@ -675,7 +814,7 @@ const SelectEffects = struct {
                         .text = "",
                         .value = 0,
                     },
-                    .effect = .{ .effect = .num_scale },
+                    .effect = .{ .effect = effect, .reward = reward },
                 }) catch unreachable;
             }
         }
@@ -689,6 +828,8 @@ const SelectEffects = struct {
                     .x = cards_x_offset + (fi * (CARD_SIZE.x + CARD_PADDING)),
                     .y = EFFECT_CARDS_Y_OFFSET,
                 };
+                const effect = GAME_EFFECTS[rng.random().uintLessThan(usize, GAME_EFFECTS.len)];
+                const reward = if (effect.isQuest()) randomQuestReward(false, rng.random()) else null;
                 self.effects.append(.{
                     .button = .{
                         .rect = .{
@@ -698,7 +839,7 @@ const SelectEffects = struct {
                         .text = "",
                         .value = 0,
                     },
-                    .effect = .{ .effect = .double_pin },
+                    .effect = .{ .effect = effect, .reward = reward },
                 }) catch unreachable;
             }
         }
@@ -756,6 +897,9 @@ pub const Game = struct {
     arena: std.mem.Allocator,
 
     pub fn init(haathi: *Haathi) Self {
+        GAME_EFFECTS = sortEffects(false, true, null, &game_effect_buffer);
+        FRAME_EFFECTS = sortEffects(true, false, null, &frame_effect_buffer);
+        helpers.debugPrint("game effects = {d}, frame_effects = {d}", .{ GAME_EFFECTS.len, FRAME_EFFECTS.len });
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         var self = Self{
@@ -824,6 +968,7 @@ pub const Game = struct {
         if (self.haathi.inputs.getKey(.a).is_clicked) self.phalanx.changeBallCol(-1);
         if (self.haathi.inputs.getKey(.d).is_clicked) self.phalanx.changeBallCol(1);
         if (self.haathi.inputs.getKey(.p).is_clicked) self.phalanx.addFrame();
+        if (self.haathi.inputs.getKey(.o).is_clicked) self.phalanx.addPinRow();
         if (self.phalanx.frame_just_complete) {
             if (self.phalanx.active_frame == self.phalanx.total_num_frames) {
                 self.show_final_screen = true;
@@ -898,13 +1043,51 @@ pub const Game = struct {
         }
     }
 
+    fn renderCard(self: *Self, card: EffectCard) void {
+        if (card.button.hovered) {
+            self.haathi.drawRect(.{
+                .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
+                .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
+                .color = colors.endesga_grey2,
+                .radius = 9,
+            });
+        }
+        if (card.selected) {
+            self.haathi.drawRect(.{
+                .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
+                .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
+                .color = colors.endesga_grey1,
+                .radius = 9,
+            });
+        }
+        self.haathi.drawRect(.{
+            .position = card.button.rect.position,
+            .size = card.button.rect.size,
+            .color = colors.endesga_grey3,
+            .radius = 5,
+        });
+        self.haathi.drawText(.{
+            .text = @tagName(card.effect.effect),
+            .position = card.button.rect.position.add(.{ .x = card.button.rect.size.x / 2, .y = 22 }),
+            .color = colors.endesga_grey1,
+        });
+        if (card.effect.reward) |reward| {
+            self.haathi.drawText(.{
+                .text = @tagName(reward.reward),
+                .position = card.button.rect.position.add(.{ .x = card.button.rect.size.x / 2, .y = 42 }),
+                .color = colors.endesga_grey1,
+                .style = SCORE1,
+            });
+        }
+    }
+
     pub fn render(self: *Self) void {
         self.haathi.drawRect(.{
             .position = .{},
             .size = SCREEN_SIZE,
             .color = colors.endesga_grey1,
         });
-        const ball_size = PIN_SPACING * 0.8;
+        const ball_size = self.phalanx.pin_scale * PIN_SPACING * 0.8;
         {
             const path_size: f32 = ball_size * 0.8;
             // ball path
@@ -1141,64 +1324,8 @@ pub const Game = struct {
                 .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = CARDS_Y_OFFSET - 20 }),
                 .color = card_select_color,
             });
-            for (self.selection.cards.items) |card| {
-                if (card.button.hovered) {
-                    self.haathi.drawRect(.{
-                        .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
-                        .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
-                        .color = colors.endesga_grey2,
-                        .radius = 9,
-                    });
-                }
-                if (card.selected) {
-                    self.haathi.drawRect(.{
-                        .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
-                        .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
-                        .color = colors.endesga_grey1,
-                        .radius = 9,
-                    });
-                }
-                self.haathi.drawRect(.{
-                    .position = card.button.rect.position,
-                    .size = card.button.rect.size,
-                    .color = colors.endesga_grey3,
-                    .radius = 5,
-                });
-                self.haathi.drawText(.{
-                    .text = @tagName(card.effect.effect),
-                    .position = card.button.rect.position.add(.{ .x = card.button.rect.size.x / 2, .y = 22 }),
-                    .color = colors.endesga_grey1,
-                });
-            }
-            for (self.selection.effects.items) |card| {
-                if (card.button.hovered) {
-                    self.haathi.drawRect(.{
-                        .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
-                        .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
-                        .color = colors.endesga_grey2,
-                        .radius = 9,
-                    });
-                }
-                if (card.selected) {
-                    self.haathi.drawRect(.{
-                        .position = card.button.rect.position.add(.{ .x = -4, .y = -4 }),
-                        .size = card.button.rect.size.add(.{ .x = 8, .y = 8 }),
-                        .color = colors.endesga_grey1,
-                        .radius = 9,
-                    });
-                }
-                self.haathi.drawRect(.{
-                    .position = card.button.rect.position,
-                    .size = card.button.rect.size,
-                    .color = colors.endesga_grey3,
-                    .radius = 5,
-                });
-                self.haathi.drawText(.{
-                    .text = @tagName(card.effect.effect),
-                    .position = card.button.rect.position.add(.{ .x = card.button.rect.size.x / 2, .y = 22 }),
-                    .color = colors.endesga_grey1,
-                });
-            }
+            for (self.selection.cards.items) |card| self.renderCard(card);
+            for (self.selection.effects.items) |card| self.renderCard(card);
             {
                 const start_button = self.selection.start;
                 if (start_button.hovered) {

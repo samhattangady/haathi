@@ -900,3 +900,9 @@ think we can get everything working, and then get to content, I think it just
 has to go hand in hand. So lets do that.
 
 Things to add: adding frames mid game?
+
+---
+
+16 Aug 2023:
+I think I tdid the thing. So now we have to figure out the next thing that we
+shoudl be doing. Okay. I think we should add quests, and more pins.
