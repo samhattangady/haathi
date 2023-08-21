@@ -7,7 +7,8 @@ pub fn build(b: *std.build.Builder) void {
     if (b.option(bool, "drifter", "Build Drifter Game")) |_| jam_game_builder(b, .drifter);
     if (b.option(bool, "juggler", "Build Juggler Game")) |_| jam_game_builder(b, .juggler);
     if (b.option(bool, "charger", "Build Charger Game")) |_| jam_game_builder(b, .charger);
-    if (b.option(bool, "holiday", "Build Juggler Game")) |_| jam_game_builder(b, .holiday);
+    if (b.option(bool, "holiday", "Build holiday Game")) |_| jam_game_builder(b, .holiday);
+    if (b.option(bool, "cellular", "Build Cellular Game")) |_| jam_game_builder(b, .cellular);
 }
 
 pub const Game = enum {
@@ -17,6 +18,7 @@ pub const Game = enum {
     juggler,
     charger,
     holiday,
+    cellular,
 };
 
 fn font_builder(b: *std.build.Builder) void {

@@ -906,3 +906,23 @@ Things to add: adding frames mid game?
 16 Aug 2023:
 I think I tdid the thing. So now we have to figure out the next thing that we
 shoudl be doing. Okay. I think we should add quests, and more pins.
+
+---
+
+21 Aug 2023:
+Cool, its another new week and another new project. This time we have the idea
+of some kind of cellular automata ruleset. Basically, the concept is that you
+will define the rules that the pixels will follow, and based on that, you will
+have to accomplish certain goals. I don't know what the goals will be at this
+point. I have no idra even whjat kind of goals make sense for an experience
+like this. But I still think that the idea has merit. 
+
+I think even just the programming and UI side of things will be relevant here.
+So yeah. In terms of getting startd, I am not sure, but IU think we can start
+off with the basic rulest, and then get that working. Hopefully it would lead
+to some ideas for mechanics and things.
+
+I like the elemental idea also. so if what we are controlling is fire, then
+water or sand can be used to "extinguish" it. Or something along those lines.
+
+Okay, lets get the basic stuffs that we want up and running ?

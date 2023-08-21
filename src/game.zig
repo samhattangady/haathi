@@ -5,7 +5,6 @@ const colors = @import("colors.zig");
 const MouseState = @import("inputs.zig").MouseState;
 const SCREEN_SIZE = @import("haathi.zig").SCREEN_SIZE;
 const CursorStyle = @import("haathi.zig").CursorStyle;
-const FONT_1 = @import("haathi.zig").FONT_1;
 
 const helpers = @import("helpers.zig");
 const Vec2 = helpers.Vec2;
@@ -48,8 +47,7 @@ pub const Game = struct {
 
     pub fn update(self: *Self, ticks: u64) void {
         // clear the arena and reset.
-        self.arena_handle.deinit();
-        self.arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+        _ = self.arena_handle.reset(.retain_capacity);
         self.arena = self.arena_handle.allocator();
         self.ticks = ticks;
     }
