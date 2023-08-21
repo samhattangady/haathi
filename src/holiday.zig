@@ -26,22 +26,20 @@ const NUM_EXTRA_SIM_STEPS = 5;
 const PIN_SPACING = 60; // pins are placed in equilateral triangles.
 const DEBUG_PRINT_1 = false;
 const HEAD_PIN_POSITION = Vec2{ .x = SCREEN_SIZE.x * 0.25, .y = SCREEN_SIZE.y * 0.5 };
-const SELECTION_POS = SCREEN_SIZE.scale(0.1);
-const SELECTION_SIZE = SCREEN_SIZE.scale(0.8);
+const SELECTION_POS = Vec2{ .x = 20, .y = 20 };
+const SELECTION_SIZE = Vec2{ .x = SCREEN_SIZE.x * 0.75, .y = (SCREEN_SIZE.y) - (DEFAULT_FRAME_SIZE * 1.6) };
 const NUM_CARDS = 6;
 const NUM_CARD_ROWS = 2;
-const CARDS_Y_OFFSET = SELECTION_SIZE.y * 0.45;
-const EFFECT_CARDS_Y_OFFSET = SELECTION_SIZE.y * 0.125;
+const CARDS_Y_OFFSET = SELECTION_SIZE.y * 0.125;
 const CARD_SIZE = Vec2{ .x = 200, .y = 120 };
 const START_BUTTON_SIZE = Vec2{ .x = CARD_SIZE.x, .y = 40 };
 const CARD_PADDING = 30;
-const NUM_EFFECT_CARDS = 3;
-const NUM_CARDS_TO_SELECT = 3;
-const NUM_EFFECTS_TO_SELECT = 1;
+const NUM_CARDS_TO_SELECT = 2;
 const BUTTON_START_Y = 60;
 const BUTTON_SIZE = Vec2{ .x = 180, .y = 30 };
-const BUTTON_START_X = SCREEN_SIZE.x * 0.55;
+const BUTTON_START_X = SCREEN_SIZE.x * 0.45;
 const BUTTON_PADDING = 20;
+const DEFAULT_FRAME_SIZE = 90;
 
 const Pin = struct {
     const Self = @This();
@@ -114,6 +112,8 @@ const Frame = struct {
     // total number of pins in frame.
     clears: std.ArrayList(bool),
     effects: std.ArrayList(ScoreEffect),
+    multiplier: usize = 1,
+    extra: usize = 0,
     total: ?usize = null,
     cumulative: ?usize = null,
 
@@ -202,7 +202,8 @@ const Scorecard = struct {
                     }
                 }
                 if (frame_scorable) {
-                    frame.total = frame_total;
+                    frame.total = frame_total * frame.multiplier;
+                    frame.total.? += frame.extra;
                 }
             }
             if (frame.total) |total| {
@@ -242,9 +243,16 @@ const Scorecard = struct {
 };
 
 const RewardType = enum {
-    multiplier,
+    /// add an extra frame
     extra_frame,
+    /// add an extra row of pins
     extra_pins,
+    /// multiply the frame score by frame number
+    frame_multiplier,
+    /// select more effects,
+    more_effects,
+    /// more cards to choose
+    more_cards,
 };
 const REWARD_TYPE_COUNT = @typeInfo(RewardType).Enum.fields.len;
 const Reward = struct {
@@ -269,17 +277,26 @@ const ScoreEffectType = enum {
     double_pin,
     /// on all rolls, knock down an equal number of pins.
     equal_score,
-    /// shield - extra effect, not frame long or game long.
-    shield,
+    /// adds its own value to all pins it knocks down
+    pin_value_adder,
+    /// leave pin standing at the end of frame
+    pin_standing,
+    /// all pins standing at the end of frame,
+    all_standing,
+    /// hit on all rolls (more than one roll
+    hit_on_all_rolls,
 
     /// this kind of effect is applied directly to a pin
     pub fn pinSpecific(self: *const Self) bool {
         return switch (self.*) {
             .num_scale,
             .equal_score,
+            .pin_value_adder,
+            .all_standing,
+            .hit_on_all_rolls,
             => false,
-            .shield,
             .double_pin,
+            .pin_standing,
             => true,
         };
     }
@@ -287,77 +304,45 @@ const ScoreEffectType = enum {
     pub fn compulsory(self: *const Self) bool {
         return switch (self.*) {
             .num_scale,
-            .shield,
             .equal_score,
+            .pin_value_adder,
+            .all_standing,
+            .hit_on_all_rolls,
             => false,
-            .double_pin => true,
-        };
-    }
-
-    pub fn isGameLong(self: *const Self) bool {
-        return switch (self.*) {
-            .num_scale,
-            .equal_score,
-            .shield,
-            => false,
-            .double_pin => true,
-        };
-    }
-
-    pub fn isFrameLong(self: *const Self) bool {
-        return switch (self.*) {
-            .num_scale,
-            .equal_score,
-            => true,
             .double_pin,
-            .shield,
-            => false,
+            .pin_standing,
+            => true,
         };
     }
 
     pub fn isQuest(self: *const Self) bool {
         return switch (self.*) {
-            .equal_score => true,
+            .equal_score,
+            .pin_standing,
+            .all_standing,
+            .hit_on_all_rolls,
+            => true,
             .num_scale,
-            .shield,
             .double_pin,
+            .pin_value_adder,
             => false,
         };
     }
 };
 const NUM_SCORE_EFFECTS = @typeInfo(ScoreEffectType).Enum.fields.len;
+const SCORE_EFFECTS = allScoreEffects();
 
-/// at comptime, we want to make lists of all the effects that we will later be randomly selecting from
-fn sortEffects(frame_long: bool, game_long: bool, is_quest: ?bool, buffer: *[NUM_SCORE_EFFECTS]ScoreEffectType) []ScoreEffectType {
-    var i: usize = 0;
-    for (0..NUM_SCORE_EFFECTS) |sc| {
-        const effect: ScoreEffectType = @enumFromInt(sc);
-        if ((frame_long and effect.isFrameLong()) or (game_long and effect.isGameLong())) {
-            if (is_quest) |iq| {
-                const effect_is_quest = effect.isQuest();
-                if (effect_is_quest == iq) {
-                    buffer[i] = effect;
-                    i += 1;
-                }
-                continue;
-            } else {
-                buffer[i] = effect;
-                i += 1;
-            }
-        }
-    }
-    return buffer[0..i];
+fn allScoreEffects() [NUM_SCORE_EFFECTS]ScoreEffectType {
+    var effects: [NUM_SCORE_EFFECTS]ScoreEffectType = undefined;
+    for (0..NUM_SCORE_EFFECTS) |i| effects[i] = @enumFromInt(i);
+    return effects;
 }
-var game_effect_buffer: [NUM_SCORE_EFFECTS]ScoreEffectType = undefined;
-var frame_effect_buffer: [NUM_SCORE_EFFECTS]ScoreEffectType = undefined;
-// TODO (16 Aug 2023 sam): This should all be comptime. But wasn't working.
-var GAME_EFFECTS: []ScoreEffectType = undefined;
-var FRAME_EFFECTS: []ScoreEffectType = undefined;
 
 const ScoreEffect = struct {
     effect: ScoreEffectType,
     index: ?usize = null,
     reward: ?Reward = null,
+    completed: bool = false,
 };
 
 const Phalanx = struct {
@@ -372,7 +357,7 @@ const Phalanx = struct {
     num_pin_rows: usize = 0,
     ticks: u64 = 0,
     sim_generation: usize = 0,
-    total_num_frames: usize = 4,
+    total_num_frames: usize = 6,
     /// the last generation that the ball hit anything. Used to end the sim.
     last_ball_hit: usize = 0,
     prev_tick: u64 = 0,
@@ -382,9 +367,10 @@ const Phalanx = struct {
     num_shots_per_frame: u8 = 2,
     frame_just_complete: bool = false,
     total_score: usize = 0,
-    multiplier: f32 = 1,
     can_throw: bool = false,
     pin_scale: f32 = 1,
+    cards_to_select: usize = NUM_CARDS_TO_SELECT,
+    card_choices: usize = 5,
     allocator: std.mem.Allocator,
     arena: std.mem.Allocator,
 
@@ -439,24 +425,11 @@ const Phalanx = struct {
             self.scorecard.frames.append(frame) catch unreachable;
         }
         self.resetBall();
-        self.score_effects.append(.{ .effect = .shield }) catch unreachable;
     }
 
     pub fn loadSelectedEffects(self: *Self, selection: SelectEffects) void {
-        for (selection.effects.items) |effect| {
-            if (effect.selected) {
-                self.score_effects.append(effect.effect) catch unreachable;
-                break;
-            }
-        }
-        for (self.score_effects.items) |effect| {
-            // load all the game-long effects onto the frame
-            if (effect.effect.isGameLong()) {
-                self.scorecard.frames.items[self.active_frame].effects.append(effect) catch unreachable;
-            }
-        }
+        self.clearFrameEffects();
         for (selection.cards.items) |card| {
-            // load the frame-long effects onto the frame
             if (card.selected) {
                 self.score_effects.append(card.effect) catch unreachable;
                 self.scorecard.frames.items[self.active_frame].effects.append(card.effect) catch unreachable;
@@ -471,11 +444,14 @@ const Phalanx = struct {
             .double_pin => {
                 self.pins.items[pin_index].value *= 2;
             },
-            .shield => {
+            .pin_standing => {
                 self.score_effects.items[effect_index].index = pin_index;
             },
             .num_scale,
             .equal_score,
+            .pin_value_adder,
+            .all_standing,
+            .hit_on_all_rolls,
             => {},
         }
     }
@@ -511,8 +487,9 @@ const Phalanx = struct {
     }
 
     fn changeBallCol(self: *Self, change: i8) void {
+        if (self.simming) return;
         self.ball_col += change;
-        self.ball_col = std.math.clamp(self.ball_col, -1 * @as(i8, @intCast(self.num_pin_rows)), @as(i8, @intCast(self.num_pin_rows)));
+        self.ball_col = std.math.clamp(self.ball_col, (-1 * @as(i8, @intCast(self.num_pin_rows))) - 1, @as(i8, @intCast(self.num_pin_rows)));
         self.resetBall();
     }
 
@@ -547,7 +524,7 @@ const Phalanx = struct {
         self.sim_generation += 1;
         self.ball.row += 1;
         self.setBallPosition();
-        if (self.ball.row > self.num_pin_rows + 2) {
+        if (self.ball.row > self.num_pin_rows + 5) {
             self.resetBall();
             self.simming = false;
             self.updateScorecard();
@@ -556,17 +533,19 @@ const Phalanx = struct {
 
     fn maybeDropPin(self: *Self, address: Vec2i, prev: ?usize, direction: Vec2i) bool {
         if (self.standingPinAt(address)) |pin_index| {
-            for (self.score_effects.items, 0..) |effect, i| {
-                if (effect.index == null) continue;
-                if (effect.index.? != pin_index) continue;
+            for (self.score_effects.items) |effect| {
                 switch (effect.effect) {
-                    .shield => {
-                        self.score_effects.items[i].index = null;
-                        return false;
+                    .pin_value_adder => {
+                        if (prev) |prev_index| {
+                            self.pins.items[pin_index].value += self.pins.items[prev_index].value;
+                        }
                     },
                     .double_pin,
                     .num_scale,
                     .equal_score,
+                    .all_standing,
+                    .hit_on_all_rolls,
+                    .pin_standing,
                     => {},
                 }
             }
@@ -629,17 +608,16 @@ const Phalanx = struct {
             }
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 6");
-        if (reset_pins) {
-            for (self.pins.items) |*pin| pin.reset();
-        }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 7");
         if (goto_next_frame) {
-            self.scorecard.frames.items[self.active_frame].complete = true;
             self.checkQuests();
-            self.clearFrameEffects();
+            self.scorecard.frames.items[self.active_frame].complete = true;
             self.active_frame += 1;
             self.frame_num_shot = 0;
             self.frame_just_complete = true;
+        }
+        if (reset_pins) {
+            for (self.pins.items) |*pin| pin.reset();
         }
         if (DEBUG_PRINT_1) c.debugPrint("updateScorecard 8");
         self.scorecard.calculateScores();
@@ -650,7 +628,7 @@ const Phalanx = struct {
     }
 
     fn checkQuests(self: *Self) void {
-        for (self.score_effects.items) |effect| {
+        for (self.score_effects.items) |*effect| {
             if (!effect.effect.isQuest()) continue;
             switch (effect.effect) {
                 .equal_score => {
@@ -665,11 +643,51 @@ const Phalanx = struct {
                             break;
                         }
                     }
-                    if (all_same) self.applyReward(effect.reward.?);
+                    if (all_same) {
+                        self.applyReward(effect.reward.?);
+                        effect.completed = true;
+                    }
+                },
+                .pin_standing => {
+                    if (effect.index) |pin_index| {
+                        if (!self.pins.items[pin_index].fallen()) {
+                            effect.completed = true;
+                            self.applyReward(effect.reward.?);
+                        }
+                    }
+                },
+                .all_standing => {
+                    var all_standing = true;
+                    for (self.pins.items) |pin| {
+                        if (pin.fallen()) {
+                            all_standing = false;
+                            break;
+                        }
+                    }
+                    if (all_standing) {
+                        self.applyReward(effect.reward.?);
+                        effect.completed = true;
+                    }
+                },
+                .hit_on_all_rolls => {
+                    const num_shots_taken = self.frame_num_shot;
+                    if (num_shots_taken == 1) continue;
+                    var all_hit = true;
+                    const frame = self.scorecard.frames.items[self.active_frame];
+                    for (0..num_shots_taken) |shot_index| {
+                        if (frame.shots.items[shot_index] == 0) {
+                            all_hit = false;
+                            break;
+                        }
+                    }
+                    if (all_hit) {
+                        self.applyReward(effect.reward.?);
+                        effect.completed = true;
+                    }
                 },
                 .num_scale,
-                .shield,
                 .double_pin,
+                .pin_value_adder,
                 => {},
             }
         }
@@ -678,26 +696,30 @@ const Phalanx = struct {
     fn applyReward(self: *Self, reward: Reward) void {
         // TODO (16 Aug 2023 sam): check the value in reward.
         switch (reward.reward) {
-            .multiplier => {},
             .extra_pins => {
                 self.addPinRow();
             },
             .extra_frame => {
                 self.addFrame();
             },
+            .frame_multiplier => {
+                self.scorecard.frames.items[self.active_frame].multiplier = self.active_frame + 1;
+            },
+            .more_effects => {
+                self.cards_to_select += 1;
+            },
+            .more_cards => {
+                self.card_choices += 1;
+            },
         }
     }
 
     fn clearFrameEffects(self: *Self) void {
-        var i = self.score_effects.items.len - 1;
-        while (true) : (i -= 1) {
-            if (self.score_effects.items[i].effect.isFrameLong()) _ = self.score_effects.orderedRemove(i);
-            if (i == 0) break;
-        }
-        self.score_effects.items[0].index = null;
+        self.score_effects.clearRetainingCapacity();
     }
 
     fn addFrame(self: *Self) void {
+        if (self.total_num_frames > 12) return;
         self.total_num_frames += 1;
         var frame = Frame.init(self.allocator);
         self.scorecard.frames.append(frame) catch unreachable;
@@ -720,9 +742,12 @@ const Phalanx = struct {
         for (self.score_effects.items) |effect| {
             switch (effect.effect) {
                 .num_scale => score *= (self.frame_num_shot + 1),
-                .double_pin,
                 .equal_score,
-                .shield,
+                .pin_value_adder,
+                .all_standing,
+                .hit_on_all_rolls,
+                .double_pin,
+                .pin_standing,
                 => {},
             }
         }
@@ -762,21 +787,20 @@ const EffectCard = struct {
 const SelectEffects = struct {
     const Self = @This();
     cards: std.ArrayList(EffectCard),
-    effects: std.ArrayList(EffectCard),
     enabled: bool = true,
     start: Button,
     cards_correct: bool = false,
     effects_correct: bool = false,
+    cards_to_select: usize = undefined,
 
     pub fn init(allocator: std.mem.Allocator) Self {
         var self = Self{
             .cards = std.ArrayList(EffectCard).init(allocator),
-            .effects = std.ArrayList(EffectCard).init(allocator),
             .start = .{
                 .rect = .{
                     .position = .{
-                        .x = SCREEN_SIZE.x - START_BUTTON_SIZE.x - CARD_PADDING,
-                        .y = (SCREEN_SIZE.y / 2) - (START_BUTTON_SIZE.y / 2),
+                        .x = SELECTION_POS.x + SELECTION_SIZE.x - 20,
+                        .y = SELECTION_POS.y + (SELECTION_SIZE.y / 2),
                     },
                     .size = START_BUTTON_SIZE,
                 },
@@ -787,50 +811,25 @@ const SelectEffects = struct {
         return self;
     }
 
-    pub fn randomiseSelection(self: *Self, seed: u64) void {
+    pub fn randomiseSelection(self: *Self, seed: u64, num_card_choices: usize, num_cards_to_select: usize) void {
+        self.cards_to_select = num_cards_to_select;
         var rng = std.rand.DefaultPrng.init(seed);
         self.cards.clearRetainingCapacity();
-        self.effects.clearRetainingCapacity();
         {
-            const num_cards_per_row: f32 = @divExact(NUM_CARDS, NUM_CARD_ROWS);
+            const num_cards_per_row: f32 = 4;
             const cards_row_width = (num_cards_per_row * CARD_SIZE.x) + ((num_cards_per_row - 1) * CARD_PADDING);
             const cards_x_offset = (SELECTION_SIZE.x - cards_row_width) / 2;
             var row: f32 = 0;
-            for (0..NUM_CARDS) |i| {
+            for (0..num_card_choices) |i| {
                 if (i > 0 and i % @as(usize, @intFromFloat(num_cards_per_row)) == 0) row += 1;
                 const fi: f32 = @as(f32, @floatFromInt(i)) - (row * num_cards_per_row);
                 const position = Vec2{
                     .x = cards_x_offset + (fi * (CARD_SIZE.x + CARD_PADDING)),
                     .y = CARDS_Y_OFFSET + (row * (CARD_SIZE.y + CARD_PADDING)),
                 };
-                const effect = FRAME_EFFECTS[rng.random().uintLessThan(usize, FRAME_EFFECTS.len)];
+                const effect = SCORE_EFFECTS[rng.random().uintLessThan(usize, SCORE_EFFECTS.len)];
                 const reward = if (effect.isQuest()) randomQuestReward(true, rng.random()) else null;
                 self.cards.append(.{
-                    .button = .{
-                        .rect = .{
-                            .position = SELECTION_POS.add(position),
-                            .size = CARD_SIZE,
-                        },
-                        .text = "",
-                        .value = 0,
-                    },
-                    .effect = .{ .effect = effect, .reward = reward },
-                }) catch unreachable;
-            }
-        }
-        {
-            const num_cards_per_row: f32 = NUM_EFFECT_CARDS;
-            const cards_row_width = (num_cards_per_row * CARD_SIZE.x) + ((num_cards_per_row - 1) * CARD_PADDING);
-            const cards_x_offset = (SELECTION_SIZE.x - cards_row_width) / 2;
-            for (0..NUM_EFFECT_CARDS) |i| {
-                const fi: f32 = @floatFromInt(i);
-                const position = Vec2{
-                    .x = cards_x_offset + (fi * (CARD_SIZE.x + CARD_PADDING)),
-                    .y = EFFECT_CARDS_Y_OFFSET,
-                };
-                const effect = GAME_EFFECTS[rng.random().uintLessThan(usize, GAME_EFFECTS.len)];
-                const reward = if (effect.isQuest()) randomQuestReward(false, rng.random()) else null;
-                self.effects.append(.{
                     .button = .{
                         .rect = .{
                             .position = SELECTION_POS.add(position),
@@ -846,12 +845,6 @@ const SelectEffects = struct {
     }
 
     fn updateMouseInputs(self: *Self, mouse: MouseState) void {
-        for (self.effects.items) |*effect| effect.button.update(mouse);
-        if (mouse.l_button.is_clicked) {
-            for (self.effects.items) |*effect| {
-                if (effect.button.contains(mouse.current_pos)) effect.selected = !effect.selected;
-            }
-        }
         for (self.cards.items) |*card| card.button.update(mouse);
         if (mouse.l_button.is_clicked) {
             for (self.cards.items) |*card| {
@@ -860,11 +853,8 @@ const SelectEffects = struct {
         }
         var cards_selected: usize = 0;
         for (self.cards.items) |card| cards_selected += if (card.selected) 1 else 0;
-        self.cards_correct = cards_selected == NUM_CARDS_TO_SELECT;
-        var effects_selected: usize = 0;
-        for (self.effects.items) |effect| effects_selected += if (effect.selected) 1 else 0;
-        self.effects_correct = effects_selected == NUM_EFFECTS_TO_SELECT;
-        self.start.enabled = self.cards_correct and self.effects_correct;
+        self.cards_correct = (cards_selected == self.cards_to_select) or (cards_selected == self.cards.items.len);
+        self.start.enabled = self.cards_correct;
         self.start.update(mouse);
     }
 };
@@ -897,9 +887,6 @@ pub const Game = struct {
     arena: std.mem.Allocator,
 
     pub fn init(haathi: *Haathi) Self {
-        GAME_EFFECTS = sortEffects(false, true, null, &game_effect_buffer);
-        FRAME_EFFECTS = sortEffects(true, false, null, &frame_effect_buffer);
-        helpers.debugPrint("game effects = {d}, frame_effects = {d}", .{ GAME_EFFECTS.len, FRAME_EFFECTS.len });
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
         var self = Self{
@@ -911,7 +898,10 @@ pub const Game = struct {
             .allocator = allocator,
             .reset_button = .{
                 .rect = .{
-                    .position = .{ .x = 20, .y = 20 },
+                    .position = .{
+                        .x = SELECTION_POS.x + SELECTION_SIZE.x + 40,
+                        .y = SELECTION_POS.y + SELECTION_SIZE.y - 30 - 20,
+                    },
                     .size = .{ .x = 180, .y = 30 },
                 },
                 .value = 0,
@@ -928,7 +918,7 @@ pub const Game = struct {
         self.phalanx.deinit();
         self.phalanx = Phalanx.init(self.allocator, self.arena);
         self.selection.enabled = true;
-        self.selection.randomiseSelection(self.ticks);
+        self.selection.randomiseSelection(self.ticks, self.phalanx.card_choices, self.phalanx.cards_to_select);
         self.show_final_screen = false;
     }
 
@@ -937,7 +927,7 @@ pub const Game = struct {
     }
 
     fn setup(self: *Self) void {
-        self.selection.randomiseSelection(helpers.milliTimestamp());
+        self.selection.randomiseSelection(helpers.milliTimestamp(), self.phalanx.card_choices, self.phalanx.cards_to_select);
     }
 
     fn resetButtons(self: *Self) void {
@@ -969,12 +959,16 @@ pub const Game = struct {
         if (self.haathi.inputs.getKey(.d).is_clicked) self.phalanx.changeBallCol(1);
         if (self.haathi.inputs.getKey(.p).is_clicked) self.phalanx.addFrame();
         if (self.haathi.inputs.getKey(.o).is_clicked) self.phalanx.addPinRow();
+        if (self.haathi.inputs.getKey(.i).is_clicked) {
+            self.phalanx.card_choices += 1;
+            self.selection.randomiseSelection(self.ticks, self.phalanx.card_choices, self.phalanx.cards_to_select);
+        }
         if (self.phalanx.frame_just_complete) {
             if (self.phalanx.active_frame == self.phalanx.total_num_frames) {
                 self.show_final_screen = true;
             } else {
                 self.phalanx.frame_just_complete = false;
-                self.selection.randomiseSelection(self.ticks);
+                self.selection.randomiseSelection(self.ticks, self.phalanx.card_choices, self.phalanx.cards_to_select);
                 self.selection.enabled = true;
             }
         }
@@ -1193,27 +1187,89 @@ pub const Game = struct {
             },
             else => {},
         }
-        for (self.phalanx.score_effects.items) |effect| {
-            if (effect.effect != .shield) continue;
-            if (effect.index == null) continue;
-            const pin = self.phalanx.pins.items[effect.index.?];
-            self.haathi.drawRect(.{
-                .position = pin.position,
-                .size = .{ .x = pin.size, .y = pin.size },
-                .color = colors.endesga_grey6,
-                .centered = true,
-                .radius = pin.size,
-            });
+        // for (self.phalanx.score_effects.items) |effect| {
+        //     if (effect.effect != .shield) continue;
+        //     if (effect.index == null) continue;
+        //     const pin = self.phalanx.pins.items[effect.index.?];
+        //     self.haathi.drawRect(.{
+        //         .position = pin.position,
+        //         .size = .{ .x = pin.size, .y = pin.size },
+        //         .color = colors.endesga_grey6,
+        //         .centered = true,
+        //         .radius = pin.size,
+        //     });
+        //     self.haathi.drawText(.{
+        //         .text = @tagName(effect.effect),
+        //         .position = pin.position,
+        //         .color = colors.endesga_grey0,
+        //         .alignment = .left,
+        //     });
+        // }
+        {
+            const ACTIVE_CARD_ROW_X = 40 + SELECTION_SIZE.x;
+            const ACTIVE_CARD_WIDTH = SCREEN_SIZE.x - ACTIVE_CARD_ROW_X - 20;
+            const ACTIVE_CARD_HEIGHT = SELECTION_SIZE.y + SELECTION_POS.y - 20;
+            const ACTIVE_CARD_CENTER_X = ACTIVE_CARD_ROW_X + (ACTIVE_CARD_WIDTH / 2);
             self.haathi.drawText(.{
-                .text = @tagName(effect.effect),
-                .position = pin.position,
-                .color = colors.endesga_grey0,
-                .alignment = .left,
+                .text = "Active Cards",
+                .position = .{ .x = ACTIVE_CARD_CENTER_X, .y = 20 + 24 },
+                .color = colors.endesga_grey4,
             });
+            self.haathi.drawRect(.{
+                .position = .{ .x = ACTIVE_CARD_ROW_X, .y = 20 },
+                .size = .{ .x = ACTIVE_CARD_WIDTH, .y = ACTIVE_CARD_HEIGHT },
+                .color = colors.endesga_grey4.alpha(0.2),
+                .radius = 4,
+            });
+            const card_padding = 10;
+            const card_height = 32;
+            for (self.phalanx.score_effects.items, 0..) |effect, i| {
+                const fi: f32 = @floatFromInt(i);
+                const y = 54 + (fi * (card_padding + card_height));
+                self.haathi.drawRect(.{
+                    .position = .{ .x = ACTIVE_CARD_ROW_X + 10, .y = y },
+                    .size = .{ .x = ACTIVE_CARD_WIDTH - 20, .y = card_height },
+                    .color = colors.endesga_grey2,
+                    .radius = 4,
+                });
+                if (effect.index) |pin_index| {
+                    const pos = self.phalanx.pins.items[pin_index].position;
+                    var points = self.arena.alloc(Vec2, 4) catch unreachable;
+                    points[0] = pos.add(.{ .y = 3 });
+                    points[1] = .{ .x = ACTIVE_CARD_ROW_X + 10, .y = y + (card_height / 2) + 3 };
+                    points[2] = .{ .x = ACTIVE_CARD_ROW_X + 10, .y = y + (card_height / 2) - 3 };
+                    points[3] = pos.add(.{ .y = -3 });
+                    self.haathi.drawPoly(.{
+                        .points = points,
+                        .color = colors.endesga_grey2,
+                    });
+                }
+                self.haathi.drawText(.{
+                    .text = @tagName(effect.effect),
+                    .position = .{ .x = ACTIVE_CARD_CENTER_X, .y = y + 14 },
+                    .color = colors.endesga_grey5,
+                    .style = PIN_VALUE_STYLE,
+                });
+                if (effect.reward) |reward| {
+                    self.haathi.drawText(.{
+                        .text = @tagName(reward.reward),
+                        .position = .{ .x = ACTIVE_CARD_CENTER_X - (ACTIVE_CARD_WIDTH / 5), .y = y + 14 + 14 },
+                        .color = colors.endesga_grey5,
+                        .style = PIN_VALUE_STYLE,
+                    });
+                    const status = if (effect.completed) "Completed" else "Incomplete";
+                    self.haathi.drawText(.{
+                        .text = status,
+                        .position = .{ .x = ACTIVE_CARD_CENTER_X + (ACTIVE_CARD_WIDTH / 4), .y = y + 14 + 14 },
+                        .color = colors.endesga_grey5,
+                        .style = PIN_VALUE_STYLE,
+                    });
+                }
+            }
         }
         {
             // draw scorecard.
-            const frame_size = if (self.phalanx.total_num_frames <= 13) 90 else SCREEN_SIZE.x / @as(f32, @floatFromInt(self.phalanx.total_num_frames)) / 1.1;
+            const frame_size = if (self.phalanx.total_num_frames <= 13) DEFAULT_FRAME_SIZE else SCREEN_SIZE.x / @as(f32, @floatFromInt(self.phalanx.total_num_frames)) / 1.1;
             const frame_padding = frame_size * 0.1;
             const num_frames: f32 = @floatFromInt(self.phalanx.total_num_frames);
             const scoreboard_width = (frame_size * num_frames) + (frame_padding * (num_frames - 1));
@@ -1265,11 +1321,20 @@ pub const Game = struct {
                             .text = cscore,
                             .color = colors.endesga_grey6,
                         });
+                        {
+                            const mul = std.fmt.allocPrintZ(self.arena, "x{d}", .{frame.multiplier}) catch unreachable;
+                            self.haathi.drawText(.{
+                                .position = .{ .x = x + (frame_size * 0.5), .y = y + frame_padding + (frame_size * 0.4) + 6 },
+                                .text = mul,
+                                .color = colors.endesga_grey5.alpha(0.6),
+                                .style = SCORE1,
+                            });
+                        }
                     }
                     if (frame.total) |total| {
                         const cscore = std.fmt.allocPrintZ(self.arena, "+{d}", .{total}) catch unreachable;
                         self.haathi.drawText(.{
-                            .position = .{ .x = x + (frame_size * 0.5), .y = y + frame_padding + (frame_size * 0.4) + 6 },
+                            .position = .{ .x = x + (frame_size * 0.5), .y = y + frame_padding + (frame_size * 0.56) + 6 },
                             .text = cscore,
                             .color = colors.endesga_grey5.alpha(0.6),
                             .style = SCORE1,
@@ -1295,13 +1360,13 @@ pub const Game = struct {
             });
             self.haathi.drawText(.{
                 .text = "Your game of bowling is complete.",
-                .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = EFFECT_CARDS_Y_OFFSET - 20 }),
+                .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = CARDS_Y_OFFSET - 20 }),
                 .color = colors.endesga_grey1,
             });
             const score = std.fmt.allocPrintZ(self.arena, "You scored {d} points", .{self.phalanx.total_score}) catch unreachable;
             self.haathi.drawText(.{
                 .text = score,
-                .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = EFFECT_CARDS_Y_OFFSET - 20 + 40 }),
+                .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = CARDS_Y_OFFSET - 20 + 40 }),
                 .color = colors.endesga_grey1,
             });
         }
@@ -1312,20 +1377,14 @@ pub const Game = struct {
                 .color = colors.endesga_grey5,
                 .radius = 5,
             });
-            const effect_select_color = if (self.selection.effects_correct) colors.endesga_grey0 else colors.endesga_red1;
-            self.haathi.drawText(.{
-                .text = "Select 1 Game Long Effect",
-                .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = EFFECT_CARDS_Y_OFFSET - 20 }),
-                .color = effect_select_color,
-            });
             const card_select_color = if (self.selection.cards_correct) colors.endesga_grey0 else colors.endesga_red1;
+            const select_text = std.fmt.allocPrintZ(self.arena, "Select {d} cards", .{self.phalanx.cards_to_select}) catch unreachable;
             self.haathi.drawText(.{
-                .text = "Select 3 Frame Long Effects",
+                .text = select_text,
                 .position = SELECTION_POS.add(.{ .x = SELECTION_SIZE.x / 2, .y = CARDS_Y_OFFSET - 20 }),
                 .color = card_select_color,
             });
             for (self.selection.cards.items) |card| self.renderCard(card);
-            for (self.selection.effects.items) |card| self.renderCard(card);
             {
                 const start_button = self.selection.start;
                 if (start_button.hovered) {
@@ -1355,17 +1414,17 @@ pub const Game = struct {
                 self.haathi.drawRect(.{
                     .position = self.reset_button.rect.position.add(.{ .x = -4, .y = -4 }),
                     .size = self.reset_button.rect.size.add(.{ .x = 8, .y = 8 }),
-                    .color = colors.endesga_grey0,
+                    .color = colors.endesga_grey1,
                     .radius = 9,
                 });
             }
             self.haathi.drawRect(.{
                 .position = self.reset_button.rect.position,
                 .size = self.reset_button.rect.size,
-                .color = colors.endesga_grey4,
+                .color = colors.endesga_grey2,
                 .radius = 5,
             });
-            const text_color = colors.endesga_grey0;
+            const text_color = colors.endesga_grey1;
             self.haathi.drawText(.{
                 .text = self.reset_button.text,
                 .position = self.reset_button.rect.position.add(self.reset_button.rect.size.scale(0.5)).add(.{ .y = 6 }),
