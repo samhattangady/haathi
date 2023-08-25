@@ -334,6 +334,14 @@ pub fn debugPrint(comptime fmt: []const u8, args: anytype) void {
     c.debugPrint(message.ptr);
 }
 
+pub fn debugPrintAlloc(allocator: std.mem.Allocator, comptime fmt: []const u8, args: anytype) void {
+    const message = std.fmt.allocPrintZ(allocator, fmt, args) catch {
+        c.debugPrint("could not alloc print sorry");
+        return;
+    };
+    c.debugPrint(message.ptr);
+}
+
 /// Checks if a ray in +ve x direction from point intersects with line v0-v1
 pub fn xRayIntersects(point: Vec2, v0: Vec2, v1: Vec2) bool {
     // if point.y is not between v0.y and v1.y, no intersection
@@ -445,4 +453,8 @@ pub fn enumChange(val: anytype, change: i8, loop: bool) @TypeOf(val) {
     const index = @intFromEnum(val);
     const new_index = applyChange(@as(u8, @intCast(index)), change, @as(u8, @intCast(max)), loop);
     return @as(T, @enumFromInt(new_index));
+}
+
+pub fn assert(condition: bool) void {
+    if (!condition) unreachable; // assertion failed.
 }

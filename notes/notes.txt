@@ -926,3 +926,38 @@ I like the elemental idea also. so if what we are controlling is fire, then
 water or sand can be used to "extinguish" it. Or something along those lines.
 
 Okay, lets get the basic stuffs that we want up and running ?
+
+---
+
+22 Aug 2023:
+I don't know what the best thing to start off with today woukd be. We could
+either make the targets. Actually, lets do the things we are sure will be
+there. Targets, editable zones. Lets start off with editable zones.
+
+---
+
+24 Aug 2023:
+It feels like a lot of the work that we  are diong is all in service of
+avoidding the actual hard work of sitting andd doing design related things. So
+I guess that means it is now time to sit and do the design related things.
+But its scary. And thats why we should do it.
+
+So I think there is also some kind of concern that the things that I think we
+need to implement are hard.
+
+But okay, lets make it simpler. Lets implment that turning level. Or maybe we
+should do the target stuff? We also need to choose a theme sooner rather than
+later.
+
+Types of levels - goals. 
+1. full level. Like the bridge.
+2. Small section - like the bolt.
+
+Okay we have the goal for today. Create the full level flow.
+[ ] level saving, loading
+[x] level completion
+[ ] level editing - 
+    [ ] rules num, sizes. 
+    [ ] initial setup, 
+    [ ] target size, location etc.
+    [ ] zones num, size, location
