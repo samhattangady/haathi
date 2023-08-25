@@ -95,6 +95,15 @@ pub fn serialize(struct_name: []const u8, data: anytype, js: *JsonSerializer) !v
     }
 }
 
+fn tryGetObject(struct_name: []const u8, js: std.json.Value, options: DeserializationOptions) ?std.json.Value {
+    if (struct_name.len == 0) return js;
+    if (js.object.get(struct_name)) |val| {
+        return val;
+    }
+    if (options.error_on_not_found) unreachable;
+    return null;
+}
+
 pub const DeserializationOptions = struct {
     error_on_not_found: bool = false,
 };
@@ -102,7 +111,7 @@ pub const DeserializationOptions = struct {
 pub fn deserialize(struct_name: []const u8, data: anytype, js: std.json.Value, options: DeserializationOptions) void {
     const figured_type = @TypeOf(data.*);
     if (@typeInfo(figured_type) == .Optional) {
-        if (js.object.get(struct_name)) |value| {
+        if (tryGetObject(struct_name, js, options)) |value| {
             if (value == .null) {
                 data.* = null;
                 return;
@@ -125,7 +134,7 @@ fn deserializeType(struct_name: []const u8, data: anytype, js: std.json.Value, o
     const is_optional = @typeInfo(@TypeOf(data.*)) == .Optional;
     switch (@typeInfo(T)) {
         .Struct => {
-            if (js.object.get(struct_name)) |value| {
+            if (tryGetObject(struct_name, js, options)) |value| {
                 if (is_optional) {
                     data.* = .{};
                     data.*.?.deserialize(value, options);
@@ -138,7 +147,7 @@ fn deserializeType(struct_name: []const u8, data: anytype, js: std.json.Value, o
             }
         },
         .Pointer => {
-            if (js.object.get(struct_name)) |value| {
+            if (tryGetObject(struct_name, js, options)) |value| {
                 data.* = value.string; // assumed that all pointers are strings
             }
         },
@@ -146,7 +155,7 @@ fn deserializeType(struct_name: []const u8, data: anytype, js: std.json.Value, o
             unreachable; // we should have taken care of optionals above
         },
         .Enum => {
-            if (js.object.get(struct_name)) |value| {
+            if (tryGetObject(struct_name, js, options)) |value| {
                 data.* = std.meta.stringToEnum(@TypeOf(data.*), value.string).?;
             } else {
                 if (options.error_on_not_found)
@@ -154,7 +163,7 @@ fn deserializeType(struct_name: []const u8, data: anytype, js: std.json.Value, o
             }
         },
         .Float => |float_data| {
-            if (js.object.get(struct_name)) |value| {
+            if (tryGetObject(struct_name, js, options)) |value| {
                 if (float_data.bits == 16) data.* = @as(f16, @floatCast(value.float));
                 if (float_data.bits == 32) data.* = @as(f32, @floatCast(value.float));
                 if (float_data.bits == 64) data.* = @as(f64, @floatCast(value.float));
@@ -164,7 +173,7 @@ fn deserializeType(struct_name: []const u8, data: anytype, js: std.json.Value, o
             }
         },
         .Int => |int_data| {
-            if (js.object.get(struct_name)) |value| {
+            if (tryGetObject(struct_name, js, options)) |value| {
                 switch (int_data.signedness) {
                     .signed => {
                         if (int_data.bits == 8) data.* = @as(i8, @intCast(value.integer));

@@ -954,10 +954,18 @@ Types of levels - goals.
 2. Small section - like the bolt.
 
 Okay we have the goal for today. Create the full level flow.
-[ ] level saving, loading
+[x] level saving
+[x] level loading
 [x] level completion
 [ ] level editing - 
     [ ] rules num, sizes. 
     [ ] initial setup, 
     [ ] target size, location etc.
     [ ] zones num, size, location
+
+---
+
+25 Aug 2023:
+Very bad. I didn't completing the things last evening. Lets do now. loading,
+here we come. Also focus on getting it done. Yesterday we focussed a bit much
+on elegance and all. Not required. Just get it working.

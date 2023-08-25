@@ -21,9 +21,15 @@ const BOARD_CENTER = Vec2{ .x = SCREEN_SIZE.x * (2.0 / 3.0), .y = SCREEN_SIZE.y 
 const BOARD_CELL_SIZE = 10;
 const BOARD_CELL_PADDING = 4;
 const STEP_PLAY_RATE_TICKS = 100;
+const BUTTON_PADDING = 20;
+const BUTTON_WIDTH = 150;
+const BUTTON_HEIGHT = 30;
+
+const EDITOR_STYLE = "10px JetBrainsMono";
 
 const LEVELS = [_][]const u8{
     @embedFile("cell_levels/lev0.json"),
+    @embedFile("cell_levels/lev1.json"),
 };
 
 const StateData = union(enum) {
@@ -63,29 +69,42 @@ const Cell = struct {
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
         try serializer.serialize("cell", self.cell, js);
     }
+
+    pub fn deserialize(self: *Self, js: std.json.Value, options: serializer.DeserializationOptions) void {
+        serializer.deserialize("cell", &self.cell, js, options);
+    }
+};
+
+const RuleButtonAction = enum {
+    hi,
+    hd,
+    wi,
+    wd,
 };
 
 const Rule = struct {
     const Self = @This();
     condition: std.ArrayList(Cell),
     result: std.ArrayList(Cell),
+    buttons: std.ArrayList(Button),
     width: usize = 7,
-    height: usize = 3,
+    height: usize = 5,
     allocator: std.mem.Allocator,
 
-    pub fn init(allocator: std.mem.Allocator, x_start: f32, y_start: f32) Self {
+    pub fn init(allocator: std.mem.Allocator) Self {
         var self = Self{
             .condition = std.ArrayList(Cell).init(allocator),
             .result = std.ArrayList(Cell).init(allocator),
+            .buttons = std.ArrayList(Button).init(allocator),
             .allocator = allocator,
         };
-        self.setup(x_start, y_start);
         return self;
     }
 
     pub fn deinit(self: *Self) void {
         self.condition.deinit();
         self.result.deinit();
+        self.buttons.deinit();
     }
 
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
@@ -93,7 +112,14 @@ const Rule = struct {
         try serializer.serialize("height", self.height, js);
     }
 
-    fn setup(self: *Self, x_start: f32, y_start: f32) void {
+    pub fn deserialize(self: *Self, js: std.json.Value, options: serializer.DeserializationOptions) void {
+        serializer.deserialize("width", &self.width, js, options);
+        serializer.deserialize("height", &self.height, js, options);
+    }
+
+    pub fn setupPositions(self: *Self, x_start: f32, y_start: f32) void {
+        self.condition.clearRetainingCapacity();
+        self.result.clearRetainingCapacity();
         for (0..(self.width * self.height)) |index| {
             const col: f32 = @floatFromInt(index % self.width);
             const row: f32 = @floatFromInt(@divFloor(index, self.width));
@@ -130,62 +156,173 @@ const Rule = struct {
                 },
             }) catch unreachable;
         }
+        self.buttons.clearRetainingCapacity();
+        const RULE_BUTTON_SIZE = 14;
+        const RULE_BUTTON_PADDING = 2;
+        for (0..@typeInfo(RuleButtonAction).Enum.fields.len) |i| {
+            const action: RuleButtonAction = @enumFromInt(i);
+            const x = x_start + (@as(f32, @floatFromInt(i)) * (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING));
+            const y = y_start - (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING);
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{ .x = x, .y = y },
+                    .size = .{ .x = RULE_BUTTON_SIZE, .y = RULE_BUTTON_SIZE },
+                },
+                .value = @intCast(i),
+                .text = @tagName(action),
+            }) catch unreachable;
+        }
     }
 
-    fn update(self: *Self, mouse: MouseState) void {
+    fn update(self: *Self, mouse: MouseState, editor: bool) void {
         for (self.condition.items) |*cell| cell.update(mouse);
         for (self.result.items) |*cell| cell.update(mouse);
+        if (editor) for (self.buttons.items) |*button| button.update(mouse);
     }
+
+    fn applyAction(self: *Self, value: u8) void {
+        const action: RuleButtonAction = @enumFromInt(value);
+        if (action == .hd and self.height == 1) return;
+        if (action == .wd and self.width == 1) return;
+        switch (action) {
+            .hi => self.height += 1,
+            .hd => self.height -= 1,
+            .wi => self.width += 1,
+            .wd => self.width -= 1,
+        }
+    }
+};
+
+const ZoneButtonAction = enum {
+    hi,
+    hd,
+    wi,
+    wd,
+    r,
+    l,
+    u,
+    d,
 };
 
 /// Zone is an area of the board that can be edited by the player.
 const Zone = struct {
     const Self = @This();
     cells: std.ArrayList(Cell),
-    target_index: usize,
-    width: usize,
-    height: usize,
+    buttons: std.ArrayList(Button),
+    target_index: usize = 0,
+    width: usize = 2,
+    height: usize = 2,
 
-    pub fn init(target: usize, width: usize, height: usize, pos: Vec2, allocator: std.mem.Allocator) Self {
+    pub fn init(allocator: std.mem.Allocator) Self {
         var self = Self{
-            .target_index = target,
-            .width = width,
-            .height = height,
             .cells = std.ArrayList(Cell).init(allocator),
+            .buttons = std.ArrayList(Button).init(allocator),
         };
-        self.setup(pos);
         return self;
     }
 
     pub fn deinit(self: *Self) void {
         self.cells.deinit();
+        self.buttons.deinit();
     }
 
-    fn setup(self: *Self, origin: Vec2) void {
-        var y: f32 = origin.y + CELL_PADDING;
-        for (0..self.height) |_| {
-            var x: f32 = origin.x + CELL_PADDING;
-            for (0..self.width) |_| {
-                self.cells.append(.{
-                    .cell = .blank,
-                    .button = .{
+    fn adjustCellNumber(self: *Self) void {
+        const current = self.cells.items.len;
+        const desired = self.width * self.height;
+        if (current == desired) {
+            return;
+        } else if (current > desired) {
+            const extra = current - desired;
+            for (0..extra) |_| _ = self.cells.pop();
+        } else {
+            const extra = desired - current;
+            for (0..extra) |_| self.cells.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
+        }
+    }
+
+    pub fn setupPositions(self: *Self, origin: Vec2) void {
+        self.adjustCellNumber();
+        {
+            var y: f32 = origin.y + CELL_PADDING;
+            for (0..self.height) |row| {
+                var x: f32 = origin.x + CELL_PADDING;
+                for (0..self.width) |col| {
+                    const index = (row * self.width) + col;
+                    self.cells.items[index].button = .{
                         .rect = .{
                             .position = .{ .x = x, .y = y },
                             .size = .{ .x = CELL_SIZE, .y = CELL_SIZE },
                         },
                         .value = 0,
                         .text = "",
-                    },
-                }) catch unreachable;
-                x += CELL_PADDING + CELL_SIZE;
+                    };
+                    x += CELL_PADDING + CELL_SIZE;
+                }
+                y += CELL_PADDING + CELL_SIZE;
             }
-            y += CELL_PADDING + CELL_SIZE;
+        }
+        {
+            self.buttons.clearRetainingCapacity();
+            const RULE_BUTTON_SIZE = 14;
+            const RULE_BUTTON_PADDING = 2;
+            for (0..@typeInfo(ZoneButtonAction).Enum.fields.len) |i| {
+                const action: ZoneButtonAction = @enumFromInt(i);
+                const x = origin.x + (@as(f32, @floatFromInt(i)) * (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING));
+                const y = origin.y - (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING);
+                self.buttons.append(.{
+                    .rect = .{
+                        .position = .{ .x = x, .y = y },
+                        .size = .{ .x = RULE_BUTTON_SIZE, .y = RULE_BUTTON_SIZE },
+                    },
+                    .value = @intCast(i),
+                    .text = @tagName(action),
+                }) catch unreachable;
+            }
         }
     }
+
+    fn applyAction(self: *Self, value: u8, board: *const Board) void {
+        const action: ZoneButtonAction = @enumFromInt(value);
+        if (action == .hd and self.height == 1) return;
+        if (action == .wd and self.width == 1) return;
+        if (action == .u and self.target_index < board.width) return;
+        if (action == .d and self.target_index + board.width > board.cells.items.len) return;
+        if (action == .l and self.target_index == 0) return;
+        if (action == .r and self.target_index == board.cells.items.len) return;
+        switch (action) {
+            .hi => self.height += 1,
+            .hd => self.height -= 1,
+            .wi => self.width += 1,
+            .wd => self.width -= 1,
+            .r => self.target_index += 1,
+            .l => self.target_index -= 1,
+            .u => self.target_index -= board.width,
+            .d => self.target_index += board.width,
+        }
+    }
+
+    fn update(self: *Self, mouse: MouseState, editor: bool) void {
+        for (self.cells.items) |*cell| cell.update(mouse);
+        if (editor) for (self.buttons.items) |*button| button.update(mouse);
+    }
+
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
         try serializer.serialize("width", self.width, js);
         try serializer.serialize("height", self.height, js);
         try serializer.serialize("target_index", self.target_index, js);
+        try serializer.serialize("cells", self.cells.items, js);
+    }
+
+    pub fn deserialize(self: *Self, js: std.json.Value, options: serializer.DeserializationOptions) void {
+        serializer.deserialize("width", &self.width, js, options);
+        serializer.deserialize("height", &self.height, js, options);
+        serializer.deserialize("target_index", &self.target_index, js, options);
+        self.cells.clearRetainingCapacity();
+        for (js.object.get("cells").?.array.items) |val| {
+            var cell: Cell = undefined;
+            serializer.deserialize("", &cell, val, options);
+            self.cells.append(cell) catch unreachable;
+        }
     }
 };
 
@@ -207,7 +344,7 @@ const SimStep = struct {
         self.step = .start;
     }
 
-    pub fn started(self: *const Self) bool {
+    pub fn atStart(self: *const Self) bool {
         return (self.step_index == 0 and self.rule_index == 0 and self.step == .start);
     }
 };
@@ -240,46 +377,25 @@ const SimMode = enum {
     }
 };
 
-const Target = struct {
-    const Self = @This();
-    start_index: usize,
-    width: usize,
-    height: usize,
-    cells: std.ArrayList(CellType),
-
-    pub fn init(index: usize, width: usize, height: usize, allocator: std.mem.Allocator) Self {
-        var self = Self{
-            .start_index = index,
-            .width = width,
-            .height = height,
-            .cells = std.ArrayList(CellType).initCapacity(allocator, width * height) catch unreachable,
-        };
-        self.setup();
-        return self;
-    }
-
-    fn setup(self: *Self) void {
-        for (0..self.width * self.height) |_| self.cells.append(.blank) catch unreachable;
-    }
-
-    pub fn deinit(self: *Self) void {
-        self.cells.deinit();
-    }
-    pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
-        try serializer.serialize("width", self.width, js);
-        try serializer.serialize("height", self.height, js);
-        try serializer.serialize("cells", self.cells.items, js);
-    }
+const BoardButtonAction = enum {
+    add_rule,
+    sub_rule,
+    add_zone,
+    sub_zone,
+    add_row,
+    sub_row,
+    add_col,
+    sub_col,
 };
 
 const Board = struct {
     const Self = @This();
     cells: std.ArrayList(Cell),
     zones: std.ArrayList(Zone),
-    target: Target,
+    buttons: std.ArrayList(Button),
+    target: Zone,
     width: usize = 7,
     height: usize = 20,
-    editing_mode: bool = true,
     completed: bool = false,
     ticks: u64 = 0,
     rules: std.ArrayList(Rule),
@@ -298,7 +414,8 @@ const Board = struct {
             .cells = std.ArrayList(Cell).init(allocator),
             .zones = std.ArrayList(Zone).init(allocator),
             .rules = std.ArrayList(Rule).init(allocator),
-            .target = Target.init(0, 7, 3, allocator),
+            .buttons = std.ArrayList(Button).init(allocator),
+            .target = Zone.init(allocator),
             .condition_indices = std.ArrayList(usize).init(allocator),
             .allocator = allocator,
             .arena = arena,
@@ -314,6 +431,7 @@ const Board = struct {
         for (self.rules.items) |*rule| rule.deinit();
         self.rules.deinit();
         self.condition_indices.deinit();
+        self.buttons.deinit();
     }
 
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
@@ -326,12 +444,36 @@ const Board = struct {
     }
 
     pub fn deserialize(self: *Self, js: std.json.Value, options: serializer.DeserializationOptions) void {
+        // cleanup the things
+        self.cells.clearRetainingCapacity();
+        for (self.rules.items) |*rule| rule.deinit();
+        self.rules.clearRetainingCapacity();
+        for (self.zones.items) |*zone| zone.deinit();
+        self.zones.clearRetainingCapacity();
+        // load the things
         serializer.deserialize("width", &self.width, js, options);
         serializer.deserialize("height", &self.height, js, options);
-        // serializer.deserialize("target", &self.target, js, options);
-        // serializer.deserialize("zones",  &self.zones.items, js, options);
-        // serializer.deserialize("rules",  &self.rules.items, js, options);
-        // serializer.deserialize("cells",  &self.cells.items, js, options);
+        serializer.deserialize("target", &self.target, js, options);
+        for (js.object.get("cells").?.array.items) |val| {
+            var cell: Cell = undefined;
+            serializer.deserialize("", &cell, val, options);
+            self.cells.append(cell) catch unreachable;
+        }
+        for (js.object.get("rules").?.array.items) |val| {
+            var rule = Rule.init(self.allocator);
+            serializer.deserialize("", &rule, val, options);
+            self.rules.append(rule) catch unreachable;
+        }
+        for (js.object.get("zones").?.array.items) |val| {
+            var zone = Zone.init(self.allocator);
+            serializer.deserialize("", &zone, val, options);
+            self.zones.append(zone) catch unreachable;
+        }
+        // setup the position things
+        self.setupBoardCellPositions();
+        self.setupRulePositions();
+        self.setupZonePositions();
+        self.setupTargetPositions();
     }
 
     pub fn saveLevel(self: *Self) !void {
@@ -347,11 +489,17 @@ const Board = struct {
     }
 
     pub fn loadLevel(self: *Self, level: []const u8) void {
-        _ = self;
-        _ = level;
+        c.debugPrint("loadLevel 1");
+        var tree = std.json.parseFromSlice(std.json.Value, self.allocator, level, .{}) catch unreachable;
+        c.debugPrint("loadLevel 2");
+        defer tree.deinit();
+        var js = tree.value;
+        c.debugPrint("loadLevel 3");
+        self.deserialize(js.object.get("level").?, .{});
+        c.debugPrint("loadLevel 4");
     }
 
-    pub fn setup(self: *Self) void {
+    fn setupBoardCellPositions(self: *Self) void {
         const width = BOARD_CELL_PADDING + ((BOARD_CELL_SIZE + BOARD_CELL_PADDING) * @as(f32, @floatFromInt(self.width)));
         const height = BOARD_CELL_PADDING + ((BOARD_CELL_SIZE + BOARD_CELL_PADDING) * @as(f32, @floatFromInt(self.height)));
         const start_x = BOARD_CENTER.x - (width / 2);
@@ -361,18 +509,50 @@ const Board = struct {
             const row: f32 = @floatFromInt(@divFloor(index, self.width));
             const x = start_x + (BOARD_CELL_PADDING * (col + 1)) + (BOARD_CELL_SIZE * col);
             const y = start_y + (BOARD_CELL_PADDING * (row + 1)) + (BOARD_CELL_SIZE * row);
-            self.cells.append(.{
-                .cell = .blank,
-                .button = .{
-                    .rect = .{
-                        .position = .{ .x = x, .y = y },
-                        .size = .{ .x = BOARD_CELL_SIZE, .y = BOARD_CELL_SIZE },
-                    },
-                    .value = 0,
-                    .text = "",
+            self.cells.items[index].button = .{
+                .rect = .{
+                    .position = .{ .x = x, .y = y },
+                    .size = .{ .x = BOARD_CELL_SIZE, .y = BOARD_CELL_SIZE },
                 },
-            }) catch unreachable;
+                .value = 0,
+                .text = "",
+            };
         }
+    }
+
+    fn setupRulePositions(self: *Self) void {
+        var y: f32 = RULE_PANE_PADDING;
+        for (self.rules.items) |*rule| {
+            rule.setupPositions(RULE_PANE_PADDING, y);
+            y += RULE_PANE_PADDING;
+            y += @as(f32, @floatFromInt(rule.height)) * (CELL_SIZE + CELL_PADDING);
+            y += CELL_PADDING;
+        }
+    }
+
+    fn setupTargetPositions(self: *Self) void {
+        const y: f32 = RULE_PANE_PADDING + BUTTON_HEIGHT + RULE_PANE_PADDING;
+        const x: f32 = (SCREEN_SIZE.x) - RULE_PANE_PADDING - BUTTON_WIDTH;
+        self.target.setupPositions(.{ .x = x, .y = y });
+    }
+
+    fn setupZonePositions(self: *Self) void {
+        var y: f32 = RULE_PANE_PADDING;
+        const x: f32 = (SCREEN_SIZE.x / 3) + RULE_PANE_PADDING;
+        for (self.zones.items) |*zone| {
+            zone.setupPositions(.{ .x = x, .y = y });
+            y += RULE_PANE_PADDING;
+            y += @as(f32, @floatFromInt(zone.height)) * (CELL_SIZE + CELL_PADDING);
+            y += CELL_PADDING;
+        }
+    }
+
+    pub fn setup(self: *Self) void {
+        c.debugPrint("board setup 0");
+        for (0..self.width * self.height) |_| self.cells.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
+        c.debugPrint("board setup 1");
+        self.setupBoardCellPositions();
+        c.debugPrint("board setup 2");
         // setup the plus
         {
             std.debug.assert(self.width >= 5);
@@ -382,24 +562,53 @@ const Board = struct {
             self.cells.items[self.indexOf(self.height - 1, 3).?].cell = .thing;
             self.cells.items[self.indexOf(self.height - 3, 3).?].cell = .thing;
         }
-        self.zones.append(Zone.init(
-            28,
-            5,
-            3,
-            .{ .x = (SCREEN_SIZE.x / 3.0) + RULE_PANE_PADDING, .y = RULE_PANE_PADDING },
-            self.allocator,
-        )) catch unreachable;
+        c.debugPrint("board setup 3");
         {
-            std.debug.assert(self.width >= 5);
-            self.target.start_index = 49;
-            self.target.cells.items[self.indexOf(1, 2).?] = .thing;
-            self.target.cells.items[self.indexOf(1, 3).?] = .thing;
-            self.target.cells.items[self.indexOf(1, 4).?] = .thing;
-            self.target.cells.items[self.indexOf(0, 3).?] = .thing;
-            self.target.cells.items[self.indexOf(2, 3).?] = .thing;
+            var zone = Zone.init(self.allocator);
+            zone.width = 3;
+            zone.height = 3;
+            zone.target_index = 10;
+            zone.setupPositions(.{ .x = (SCREEN_SIZE.x / 3) + RULE_PANE_PADDING, .y = RULE_PANE_PADDING });
+            self.zones.append(zone) catch unreachable;
         }
-        self.rules.append(Rule.init(self.allocator, RULE_PANE_PADDING, RULE_PANE_PADDING)) catch unreachable;
-        self.rules.append(Rule.init(self.allocator, RULE_PANE_PADDING, (2 * RULE_PANE_PADDING) + (3 * (CELL_SIZE + CELL_PADDING)) + CELL_PADDING)) catch unreachable;
+        c.debugPrint("board setup 4");
+        {
+            self.target.width = 7;
+            self.target.height = 3;
+            self.setupTargetPositions();
+            c.debugPrint("board setup 4.1");
+            std.debug.assert(self.width >= 5);
+            self.target.target_index = 49;
+            self.target.cells.items[self.indexOf(1, 2).?].cell = .thing;
+            self.target.cells.items[self.indexOf(1, 3).?].cell = .thing;
+            self.target.cells.items[self.indexOf(1, 4).?].cell = .thing;
+            self.target.cells.items[self.indexOf(0, 3).?].cell = .thing;
+            self.target.cells.items[self.indexOf(2, 3).?].cell = .thing;
+        }
+        c.debugPrint("board setup 5");
+        self.rules.append(Rule.init(self.allocator)) catch unreachable;
+        self.rules.append(Rule.init(self.allocator)) catch unreachable;
+        c.debugPrint("board setup 6");
+        self.setupRulePositions();
+        c.debugPrint("board setup 7");
+        const BOARD_RULE_HEIGHT = 16;
+        const BOARD_RULE_WIDTH = 60;
+        const BOARD_RULE_PADDING = 6;
+        c.debugPrint("board setup 8");
+        for (0..@typeInfo(BoardButtonAction).Enum.fields.len) |i| {
+            const action: BoardButtonAction = @enumFromInt(i);
+            const y: f32 = BOARD_RULE_PADDING + (@as(f32, @floatFromInt(i)) * (BOARD_RULE_HEIGHT + BOARD_RULE_PADDING));
+            const x: f32 = (SCREEN_SIZE.x / 3) - BOARD_RULE_PADDING - BOARD_RULE_WIDTH;
+            self.buttons.append(.{
+                .rect = .{
+                    .position = .{ .x = x, .y = y },
+                    .size = .{ .x = BOARD_RULE_WIDTH, .y = BOARD_RULE_HEIGHT },
+                },
+                .value = @intCast(i),
+                .text = @tagName(action),
+            }) catch unreachable;
+        }
+        c.debugPrint("board setup 9");
     }
 
     fn indexOf(self: *Self, row: usize, col: usize) ?usize {
@@ -475,8 +684,8 @@ const Board = struct {
         for (0..self.target.height) |row| {
             for (0..self.target.width) |col| {
                 const index = (row * self.target.width) + col;
-                const board_index = self.target.start_index + (row * self.width) + col;
-                if (self.target.cells.items[index] != self.cells.items[board_index].cell) {
+                const board_index = self.target.target_index + (row * self.width) + col;
+                if (self.target.cells.items[index].cell != self.cells.items[board_index].cell) {
                     self.completed = false;
                     return;
                 }
@@ -485,24 +694,120 @@ const Board = struct {
         self.sim_mode = .paused;
     }
 
-    pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator, mouse: MouseState) void {
+    pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator, mouse: MouseState, editor: bool) void {
         self.ticks = ticks;
         self.arena = arena;
-        for (self.rules.items) |*rule| rule.update(mouse);
-        if (self.editing_mode) {
+        for (self.rules.items) |*rule| rule.update(mouse, editor);
+        for (self.zones.items) |*zone| zone.update(mouse, editor);
+        if (self.sim_step.atStart()) {
+            for (self.zones.items) |*zone| {
+                self.updateFromZone(zone);
+            }
+        }
+        if (editor) {
             for (self.cells.items) |*cell| {
                 cell.update(mouse);
             }
+            for (self.buttons.items) |*button| button.update(mouse);
+            for (self.buttons.items) |button| {
+                if (button.clicked) self.applyAction(@enumFromInt(button.value));
+            }
+            var rule_update = false;
+            for (self.rules.items) |*rule| {
+                for (rule.buttons.items) |button| {
+                    if (button.clicked) {
+                        rule_update = true;
+                        rule.applyAction(button.value);
+                    }
+                }
+            }
+            if (rule_update) self.setupRulePositions();
+            var zone_update = false;
+            for (self.zones.items) |*zone| {
+                for (zone.buttons.items) |button| {
+                    if (button.clicked) {
+                        zone_update = true;
+                        zone.applyAction(button.value, self);
+                    }
+                }
+            }
+            if (zone_update) self.setupZonePositions();
+            var target_update = false;
+            self.target.update(mouse, editor);
+            for (self.target.buttons.items) |button| {
+                if (button.clicked) {
+                    target_update = true;
+                    self.target.applyAction(button.value, self);
+                }
+            }
+            if (target_update) self.setupTargetPositions();
         }
         if (self.sim_mode.playing()) {
             if (self.ticks - self.last_step_ticks > STEP_PLAY_RATE_TICKS) self.step();
             if (self.sim_step.step_index - self.last_step_areas_found > 2) self.sim_mode = .paused;
         }
-        if (self.sim_step.started()) {
-            for (self.zones.items) |*zone| {
-                for (zone.cells.items) |*cell| cell.update(mouse);
-                self.updateFromZone(zone);
-            }
+    }
+
+    fn applyAction(self: *Self, action: BoardButtonAction) void {
+        switch (action) {
+            .add_rule => {
+                var rule = Rule.init(self.allocator);
+                self.rules.append(rule) catch unreachable;
+                self.setupRulePositions();
+            },
+            .sub_rule => {
+                if (self.rules.items.len == 0) return;
+                var rule = self.rules.pop();
+                rule.deinit();
+                self.setupRulePositions();
+            },
+            .add_zone => {
+                var zone = Zone.init(self.allocator);
+                self.zones.append(zone) catch unreachable;
+                self.setupZonePositions();
+            },
+            .sub_zone => {
+                if (self.zones.items.len == 0) return;
+                var zone = self.zones.pop();
+                zone.deinit();
+                self.setupZonePositions();
+            },
+            .add_row => {
+                self.height += 1;
+                self.adjustCellNumber();
+                self.setupBoardCellPositions();
+            },
+            .sub_row => {
+                if (self.height == 1) return;
+                self.height -= 1;
+                self.adjustCellNumber();
+                self.setupBoardCellPositions();
+            },
+            .add_col => {
+                self.width += 1;
+                self.adjustCellNumber();
+                self.setupBoardCellPositions();
+            },
+            .sub_col => {
+                if (self.width == 1) return;
+                self.width -= 1;
+                self.adjustCellNumber();
+                self.setupBoardCellPositions();
+            },
+        }
+    }
+
+    fn adjustCellNumber(self: *Self) void {
+        const current = self.cells.items.len;
+        const desired = self.width * self.height;
+        if (current == desired) {
+            return;
+        } else if (current > desired) {
+            const extra = current - desired;
+            for (0..extra) |_| _ = self.cells.pop();
+        } else {
+            const extra = desired - current;
+            for (0..extra) |_| self.cells.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
         }
     }
 
@@ -521,8 +826,10 @@ const Board = struct {
 
     pub fn clearBoard(self: *Self) void {
         self.sim_step.reset();
+        self.last_step_areas_found = 0;
         for (self.cells.items) |*cell| cell.cell = .blank;
         self.completed = false;
+        self.condition_indices.clearRetainingCapacity();
     }
 };
 
@@ -542,6 +849,7 @@ pub const Game = struct {
     buttons: std.ArrayList(Button),
     show_target: bool = false,
     board: Board,
+    editor_mode: bool = true,
 
     allocator: std.mem.Allocator,
     arena_handle: std.heap.ArenaAllocator,
@@ -569,9 +877,6 @@ pub const Game = struct {
     fn setup(self: *Self) void {
         {
             // buttons
-            const BUTTON_PADDING = 20;
-            const BUTTON_WIDTH = 150;
-            const BUTTON_HEIGHT = 30;
             var x = SCREEN_SIZE.x - BUTTON_PADDING;
             for (0..@typeInfo(ButtonAction).Enum.fields.len) |i| {
                 const action: ButtonAction = @enumFromInt(i);
@@ -606,7 +911,7 @@ pub const Game = struct {
         _ = self.arena_handle.reset(.retain_capacity);
         self.arena = self.arena_handle.allocator();
         self.ticks = ticks;
-        self.board.update(self.ticks, self.arena, self.haathi.inputs.mouse);
+        self.board.update(self.ticks, self.arena, self.haathi.inputs.mouse, self.editor_mode);
         if (self.haathi.inputs.getKey(.a).is_clicked) {
             self.board.step();
         }
@@ -615,6 +920,12 @@ pub const Game = struct {
         }
         if (self.haathi.inputs.getKey(.s).is_clicked) {
             self.board.saveLevel() catch unreachable;
+        }
+        if (self.haathi.inputs.getKey(.l).is_clicked) {
+            self.board.loadLevel(LEVELS[1]);
+        }
+        if (true and self.haathi.inputs.getKey(.tab).is_clicked) {
+            self.editor_mode = !self.editor_mode;
         }
         for (self.buttons.items) |*button| button.update(self.haathi.inputs.mouse);
         for (self.buttons.items, 0..) |button, i| {
@@ -703,6 +1014,56 @@ pub const Game = struct {
                     .radius = 2,
                 });
             }
+            if (self.editor_mode) {
+                for (rule.buttons.items) |button| {
+                    if (button.hovered) {
+                        self.haathi.drawRect(.{
+                            .position = button.rect.position.add(.{ .x = -2, .y = -2 }),
+                            .size = button.rect.size.add(.{ .x = 4, .y = 4 }),
+                            .color = colors.endesga_grey0,
+                            .radius = 4,
+                        });
+                    }
+                    self.haathi.drawRect(.{
+                        .position = button.rect.position,
+                        .size = button.rect.size,
+                        .color = colors.endesga_grey4,
+                        .radius = 2,
+                    });
+                    const text_color = colors.endesga_grey0;
+                    self.haathi.drawText(.{
+                        .text = button.text,
+                        .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 3 }),
+                        .color = text_color,
+                        .style = EDITOR_STYLE,
+                    });
+                }
+            }
+        }
+        if (self.editor_mode) {
+            for (self.board.buttons.items) |button| {
+                if (button.hovered) {
+                    self.haathi.drawRect(.{
+                        .position = button.rect.position.add(.{ .x = -2, .y = -2 }),
+                        .size = button.rect.size.add(.{ .x = 4, .y = 4 }),
+                        .color = colors.endesga_grey0,
+                        .radius = 4,
+                    });
+                }
+                self.haathi.drawRect(.{
+                    .position = button.rect.position,
+                    .size = button.rect.size,
+                    .color = colors.endesga_grey4,
+                    .radius = 2,
+                });
+                const text_color = colors.endesga_grey0;
+                self.haathi.drawText(.{
+                    .text = button.text,
+                    .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 3 }),
+                    .color = text_color,
+                    .style = EDITOR_STYLE,
+                });
+            }
         }
         for (self.board.condition_indices.items) |index| {
             const cell = self.board.cells.items[index];
@@ -770,6 +1131,104 @@ pub const Game = struct {
                     .radius = 1,
                 });
             }
+            if (self.editor_mode) {
+                for (zone.buttons.items) |button| {
+                    if (button.hovered) {
+                        self.haathi.drawRect(.{
+                            .position = button.rect.position.add(.{ .x = -2, .y = -2 }),
+                            .size = button.rect.size.add(.{ .x = 4, .y = 4 }),
+                            .color = colors.endesga_grey0,
+                            .radius = 4,
+                        });
+                    }
+                    self.haathi.drawRect(.{
+                        .position = button.rect.position,
+                        .size = button.rect.size,
+                        .color = colors.endesga_grey4,
+                        .radius = 2,
+                    });
+                    const text_color = colors.endesga_grey0;
+                    self.haathi.drawText(.{
+                        .text = button.text,
+                        .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 3 }),
+                        .color = text_color,
+                        .style = EDITOR_STYLE,
+                    });
+                }
+            }
+        }
+        { // draw target things
+            const zone = self.board.target;
+            const bg_color = colors.endesga_grey5.lerp(colors.endesga_grey2, 0.7);
+            var points = self.arena.alloc(Vec2, 2) catch unreachable;
+            {
+                const pos = zone.cells.items[0].button.rect.position.add(.{ .x = -CELL_PADDING, .y = -CELL_PADDING });
+                const size = Vec2{
+                    .x = CELL_PADDING + (@as(f32, @floatFromInt(zone.width)) * (CELL_PADDING + CELL_SIZE)),
+                    .y = CELL_PADDING + (@as(f32, @floatFromInt(zone.height)) * (CELL_PADDING + CELL_SIZE)),
+                };
+                // bg of zone
+                self.haathi.drawRect(.{
+                    .position = pos,
+                    .size = size,
+                    .color = bg_color,
+                    .radius = 3,
+                });
+                points[0] = pos.add(size.scale(0.5));
+            }
+            {
+                // bg of area in board
+                const pos = self.board.cells.items[zone.target_index].button.rect.position.add(.{ .x = -BOARD_CELL_PADDING, .y = -BOARD_CELL_PADDING });
+                const size = Vec2{
+                    .x = BOARD_CELL_PADDING + (@as(f32, @floatFromInt(zone.width)) * (BOARD_CELL_PADDING + BOARD_CELL_SIZE)),
+                    .y = BOARD_CELL_PADDING + (@as(f32, @floatFromInt(zone.height)) * (BOARD_CELL_PADDING + BOARD_CELL_SIZE)),
+                };
+                self.haathi.drawRect(.{
+                    .position = pos,
+                    .size = size,
+                    .color = bg_color,
+                    .radius = 3,
+                });
+                points[1] = pos.add(size.scale(0.5));
+            }
+            self.haathi.drawPath(.{
+                .points = points,
+                .color = bg_color,
+                .width = 4,
+            });
+            for (zone.cells.items) |cell| {
+                self.haathi.drawRect(.{
+                    .position = cell.button.rect.position,
+                    .size = cell.button.rect.size,
+                    .color = cell.cell.toColor(),
+                    .radius = 1,
+                });
+            }
+            if (self.editor_mode) {
+                for (zone.buttons.items) |button| {
+                    if (button.hovered) {
+                        self.haathi.drawRect(.{
+                            .position = button.rect.position.add(.{ .x = -2, .y = -2 }),
+                            .size = button.rect.size.add(.{ .x = 4, .y = 4 }),
+                            .color = colors.endesga_grey0,
+                            .radius = 4,
+                        });
+                    }
+                    self.haathi.drawRect(.{
+                        .position = button.rect.position,
+                        .size = button.rect.size,
+                        .color = colors.endesga_grey4,
+                        .radius = 2,
+                    });
+                    const text_color = colors.endesga_grey0;
+                    self.haathi.drawText(.{
+                        .text = button.text,
+                        .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 3 }),
+                        .color = text_color,
+                        .style = EDITOR_STYLE,
+                    });
+                }
+            }
         }
         for (self.board.cells.items) |cell| {
             self.haathi.drawRect(.{
@@ -787,7 +1246,7 @@ pub const Game = struct {
             });
         }
         if (self.show_target or self.board.completed) {
-            const pos = self.board.cells.items[self.board.target.start_index].button.rect.position;
+            const pos = self.board.cells.items[self.board.target.target_index].button.rect.position;
             const width = (@as(f32, @floatFromInt(self.board.target.width)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
             const height = (@as(f32, @floatFromInt(self.board.target.height)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
             self.haathi.drawRect(.{
@@ -807,12 +1266,12 @@ pub const Game = struct {
                     const frow: f32 = @floatFromInt(row);
                     const fcol: f32 = @floatFromInt(col);
                     const index = (row * self.board.target.width) + col;
-                    const color = self.board.target.cells.items[index].toColor();
+                    const color = self.board.target.cells.items[index].cell.toColor();
                     const cell_pos = pos.add(.{
                         .x = fcol * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
                         .y = frow * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
                     });
-                    const is_error = self.board.target.cells.items[index] != self.board.cells.items[self.board.target.start_index + (self.board.width * row) + col].cell;
+                    const is_error = self.board.target.cells.items[index].cell != self.board.cells.items[self.board.target.target_index + (self.board.width * row) + col].cell;
                     if (is_error) {
                         self.haathi.drawRect(.{
                             .position = cell_pos.add(.{ .x = -BOARD_CELL_PADDING, .y = -BOARD_CELL_PADDING }),
