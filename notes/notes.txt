@@ -957,11 +957,11 @@ Okay we have the goal for today. Create the full level flow.
 [x] level saving
 [x] level loading
 [x] level completion
-[ ] level editing - 
-    [ ] rules num, sizes. 
-    [ ] initial setup, 
-    [ ] target size, location etc.
-    [ ] zones num, size, location
+[x] level editing - 
+    [x] rules num, sizes. 
+    [x] initial setup, 
+    [x] target size, location etc.
+    [x] zones num, size, location
 
 ---
 
@@ -969,3 +969,28 @@ Okay we have the goal for today. Create the full level flow.
 Very bad. I didn't completing the things last evening. Lets do now. loading,
 here we come. Also focus on getting it done. Yesterday we focussed a bit much
 on elegance and all. Not required. Just get it working.
+
+---
+
+28 Aug 2023:
+Cool. We have all the things set up and in place. We get to do one whole week
+of level design. That sounds only pretty tiring but we got this =)
+
+[x] Add play pause button / make sim stop once its looping
+[ ] Cordon off some cells in the board (same color as off board)
+[x] change clear board to reset board.
+[ ] Add support for rules to detect blank cells (off board) ?
+[x] Click and drag to toggle multiple cells
+[x] Permanent cells - already on board. cannot be removed. can be used in
+    condition of rule - result will automatically match.
+[x] Multiple target zones?
+[ ] Mechanically, cells that can only be edited after set time. If before
+    that, you lose.
+[x] Rules with fixed conditions.
+[x] Rules only affect the first instance of the condition.
+[ ] button to clear rule?
+[ ] rules that rotate?
+[ ] mirrored boards?
+
+NEXT: Get fixed condition + result stuff working.
+

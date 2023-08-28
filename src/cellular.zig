@@ -28,8 +28,10 @@ const BUTTON_HEIGHT = 30;
 const EDITOR_STYLE = "10px JetBrainsMono";
 
 const LEVELS = [_][]const u8{
-    @embedFile("cell_levels/lev0.json"),
+    @embedFile("cell_levels/autosolver.json"),
     @embedFile("cell_levels/lev1.json"),
+    @embedFile("cell_levels/lev2.json"),
+    @embedFile("cell_levels/needs_fixed_conditions.json"),
 };
 
 const StateData = union(enum) {
@@ -43,11 +45,13 @@ const CellType = enum {
     const Self = @This();
     blank,
     thing,
+    permanent,
 
     pub fn toColor(self: *const Self) Vec4 {
         return switch (self.*) {
             .blank => colors.endesga_grey1,
             .thing => colors.endesga_grey3,
+            .permanent => colors.endesga_grey5,
         };
     }
 
@@ -60,10 +64,19 @@ const Cell = struct {
     const Self = @This();
     cell: CellType,
     button: Button,
+    /// stores the tick at which the cell was last toggled. This is to allow
+    /// click and drag to change multiple cells together
+    toggled_at: u64 = 0,
 
-    pub fn update(self: *Self, mouse: MouseState) void {
+    pub fn update(self: *Self, mouse: MouseState, ticks: u64, allow_permanent: bool) void {
         self.button.update(mouse);
-        if (self.button.clicked) self.cell = helpers.enumChange(self.cell, 1, true);
+        if ((mouse.l_button.is_down and self.button.contains(mouse.current_pos) and self.toggled_at < mouse.l_button.down_from) or self.button.clicked) {
+            self.cell = helpers.enumChange(self.cell, 1, true);
+            self.toggled_at = ticks;
+            if (self.cell == .permanent and !allow_permanent) {
+                self.cell = helpers.enumChange(self.cell, 1, true);
+            }
+        }
     }
 
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
@@ -80,6 +93,12 @@ const RuleButtonAction = enum {
     hd,
     wi,
     wd,
+    fc, // fixed_condition
+    fr, // fixed_result
+};
+
+const RulePlayerButtonAction = enum {
+    reset,
 };
 
 const Rule = struct {
@@ -87,8 +106,11 @@ const Rule = struct {
     condition: std.ArrayList(Cell),
     result: std.ArrayList(Cell),
     buttons: std.ArrayList(Button),
-    width: usize = 7,
-    height: usize = 5,
+    player_buttons: std.ArrayList(Button),
+    fixed_condition: bool = false,
+    fixed_result: bool = false,
+    width: usize = 3,
+    height: usize = 3,
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) Self {
@@ -96,6 +118,7 @@ const Rule = struct {
             .condition = std.ArrayList(Cell).init(allocator),
             .result = std.ArrayList(Cell).init(allocator),
             .buttons = std.ArrayList(Button).init(allocator),
+            .player_buttons = std.ArrayList(Button).init(allocator),
             .allocator = allocator,
         };
         return self;
@@ -105,37 +128,91 @@ const Rule = struct {
         self.condition.deinit();
         self.result.deinit();
         self.buttons.deinit();
+        self.player_buttons.deinit();
     }
 
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
         try serializer.serialize("width", self.width, js);
         try serializer.serialize("height", self.height, js);
+        if (self.fixed_condition) try serializer.serialize("fixed_condition", self.condition.items, js);
+        if (self.fixed_result) try serializer.serialize("fixed_result", self.result.items, js);
     }
 
     pub fn deserialize(self: *Self, js: std.json.Value, options: serializer.DeserializationOptions) void {
         serializer.deserialize("width", &self.width, js, options);
         serializer.deserialize("height", &self.height, js, options);
+        if (js.object.get("fixed_condition") != null) {
+            self.condition.clearRetainingCapacity();
+            for (js.object.get("fixed_condition").?.array.items) |val| {
+                var cell: Cell = undefined;
+                serializer.deserialize("", &cell, val, options);
+                self.condition.append(cell) catch unreachable;
+            }
+            self.fixed_condition = true;
+        }
+        if (js.object.get("fixed_result") != null) {
+            self.result.clearRetainingCapacity();
+            for (js.object.get("fixed_result").?.array.items) |val| {
+                var cell: Cell = undefined;
+                serializer.deserialize("", &cell, val, options);
+                self.result.append(cell) catch unreachable;
+            }
+            self.fixed_result = true;
+        }
+    }
+
+    fn adjustCellNumber(self: *Self) void {
+        condition_cells: {
+            const current = self.condition.items.len;
+            const desired = self.width * self.height;
+            if (current == desired) {
+                break :condition_cells;
+            } else if (current > desired) {
+                const extra = current - desired;
+                for (0..extra) |_| {
+                    _ = self.condition.pop();
+                }
+            } else {
+                const extra = desired - current;
+                for (0..extra) |_| {
+                    self.condition.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
+                }
+            }
+        }
+        result_cells: {
+            const current = self.result.items.len;
+            const desired = self.width * self.height;
+            if (current == desired) {
+                break :result_cells;
+            } else if (current > desired) {
+                const extra = current - desired;
+                for (0..extra) |_| {
+                    _ = self.result.pop();
+                }
+            } else {
+                const extra = desired - current;
+                for (0..extra) |_| {
+                    self.result.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
+                }
+            }
+        }
     }
 
     pub fn setupPositions(self: *Self, x_start: f32, y_start: f32) void {
-        self.condition.clearRetainingCapacity();
-        self.result.clearRetainingCapacity();
+        self.adjustCellNumber();
         for (0..(self.width * self.height)) |index| {
             const col: f32 = @floatFromInt(index % self.width);
             const row: f32 = @floatFromInt(@divFloor(index, self.width));
             const x = x_start + (CELL_PADDING * (col + 1)) + (CELL_SIZE * col);
             const y = y_start + (CELL_PADDING * (row + 1)) + (CELL_SIZE * row);
-            self.condition.append(.{
-                .cell = .blank,
-                .button = .{
-                    .rect = .{
-                        .position = .{ .x = x, .y = y },
-                        .size = .{ .x = CELL_SIZE, .y = CELL_SIZE },
-                    },
-                    .value = 0,
-                    .text = "",
+            self.condition.items[index].button = .{
+                .rect = .{
+                    .position = .{ .x = x, .y = y },
+                    .size = .{ .x = CELL_SIZE, .y = CELL_SIZE },
                 },
-            }) catch unreachable;
+                .value = 0,
+                .text = "",
+            };
         }
         const condition_width = (@as(f32, @floatFromInt(self.width)) * (CELL_SIZE + CELL_PADDING)) + CELL_PADDING;
         const x_result = x_start + condition_width + RULE_PANE_PADDING;
@@ -144,39 +221,70 @@ const Rule = struct {
             const row: f32 = @floatFromInt(@divFloor(index, self.width));
             const x = x_result + (CELL_PADDING * (col + 1)) + (CELL_SIZE * col);
             const y = y_start + (CELL_PADDING * (row + 1)) + (CELL_SIZE * row);
-            self.result.append(.{
-                .cell = .blank,
-                .button = .{
-                    .rect = .{
-                        .position = .{ .x = x, .y = y },
-                        .size = .{ .x = CELL_SIZE, .y = CELL_SIZE },
-                    },
-                    .value = 0,
-                    .text = "",
-                },
-            }) catch unreachable;
-        }
-        self.buttons.clearRetainingCapacity();
-        const RULE_BUTTON_SIZE = 14;
-        const RULE_BUTTON_PADDING = 2;
-        for (0..@typeInfo(RuleButtonAction).Enum.fields.len) |i| {
-            const action: RuleButtonAction = @enumFromInt(i);
-            const x = x_start + (@as(f32, @floatFromInt(i)) * (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING));
-            const y = y_start - (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING);
-            self.buttons.append(.{
+            self.result.items[index].button = .{
                 .rect = .{
                     .position = .{ .x = x, .y = y },
-                    .size = .{ .x = RULE_BUTTON_SIZE, .y = RULE_BUTTON_SIZE },
+                    .size = .{ .x = CELL_SIZE, .y = CELL_SIZE },
                 },
-                .value = @intCast(i),
-                .text = @tagName(action),
-            }) catch unreachable;
+                .value = 0,
+                .text = "",
+            };
+        }
+        {
+            self.buttons.clearRetainingCapacity();
+            const RULE_BUTTON_SIZE = 14;
+            const RULE_BUTTON_PADDING = 2;
+            for (0..@typeInfo(RuleButtonAction).Enum.fields.len) |i| {
+                const action: RuleButtonAction = @enumFromInt(i);
+                const x = x_start + (@as(f32, @floatFromInt(i)) * (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING));
+                const y = y_start - (RULE_BUTTON_SIZE + RULE_BUTTON_PADDING);
+                self.buttons.append(.{
+                    .rect = .{
+                        .position = .{ .x = x, .y = y },
+                        .size = .{ .x = RULE_BUTTON_SIZE, .y = RULE_BUTTON_SIZE },
+                    },
+                    .value = @intCast(i),
+                    .text = @tagName(action),
+                }) catch unreachable;
+            }
+        }
+        {
+            self.player_buttons.clearRetainingCapacity();
+            for (0..@typeInfo(RulePlayerButtonAction).Enum.fields.len) |i| {
+                const action: RulePlayerButtonAction = @enumFromInt(i);
+                const res0 = self.result.items[0].button.rect;
+                const pos = res0.position.add(.{
+                    .x = @as(f32, @floatFromInt(self.width)) * (CELL_PADDING + CELL_SIZE),
+                    .y = ((@as(f32, @floatFromInt(self.height)) * (CELL_PADDING + CELL_SIZE)) / 2) + (BUTTON_HEIGHT / 2),
+                });
+                self.player_buttons.append(.{
+                    .rect = .{
+                        .position = pos,
+                        .size = .{ .x = BUTTON_WIDTH, .y = BUTTON_HEIGHT },
+                    },
+                    .value = @intCast(i),
+                    .text = @tagName(action),
+                }) catch unreachable;
+            }
         }
     }
 
-    fn update(self: *Self, mouse: MouseState, editor: bool) void {
-        for (self.condition.items) |*cell| cell.update(mouse);
-        for (self.result.items) |*cell| cell.update(mouse);
+    fn copyPermanent(self: *Self) void {
+        // copies permanent from condition to rule
+        for (self.condition.items, self.result.items) |cond, *res| {
+            if (cond.cell == .permanent) {
+                res.cell = .permanent;
+            } else if (res.cell == .permanent) {
+                res.cell = .blank;
+            }
+        }
+    }
+
+    fn update(self: *Self, mouse: MouseState, editor: bool, ticks: u64, permanent_exists: bool) void {
+        // TODO (28 Aug 2023 sam): condition should be based on if level has perm
+        if (!self.fixed_condition) for (self.condition.items) |*cell| cell.update(mouse, ticks, permanent_exists);
+        if (!self.fixed_result) for (self.result.items) |*cell| cell.update(mouse, ticks, false);
+        self.copyPermanent();
         if (editor) for (self.buttons.items) |*button| button.update(mouse);
     }
 
@@ -189,6 +297,8 @@ const Rule = struct {
             .hd => self.height -= 1,
             .wi => self.width += 1,
             .wd => self.width -= 1,
+            .fc => self.fixed_condition = !self.fixed_condition,
+            .fr => self.fixed_result = !self.fixed_result,
         }
     }
 };
@@ -301,8 +411,8 @@ const Zone = struct {
         }
     }
 
-    fn update(self: *Self, mouse: MouseState, editor: bool) void {
-        for (self.cells.items) |*cell| cell.update(mouse);
+    fn update(self: *Self, mouse: MouseState, editor: bool, ticks: u64) void {
+        for (self.cells.items) |*cell| cell.update(mouse, ticks, false);
         if (editor) for (self.buttons.items) |*button| button.update(mouse);
     }
 
@@ -382,6 +492,8 @@ const BoardButtonAction = enum {
     sub_rule,
     add_zone,
     sub_zone,
+    add_target,
+    sub_target,
     add_row,
     sub_row,
     add_col,
@@ -391,12 +503,15 @@ const BoardButtonAction = enum {
 const Board = struct {
     const Self = @This();
     cells: std.ArrayList(Cell),
+    // stores the start state of all the cells for the level.
+    start_state: std.ArrayList(CellType),
     zones: std.ArrayList(Zone),
+    targets: std.ArrayList(Zone),
     buttons: std.ArrayList(Button),
-    target: Zone,
     width: usize = 7,
     height: usize = 20,
     completed: bool = false,
+    permanent_exists: bool = false,
     ticks: u64 = 0,
     rules: std.ArrayList(Rule),
     sim_mode: SimMode = .paused,
@@ -412,10 +527,11 @@ const Board = struct {
     pub fn init(allocator: std.mem.Allocator, arena: std.mem.Allocator) Self {
         var self = Self{
             .cells = std.ArrayList(Cell).init(allocator),
+            .start_state = std.ArrayList(CellType).init(allocator),
             .zones = std.ArrayList(Zone).init(allocator),
+            .targets = std.ArrayList(Zone).init(allocator),
             .rules = std.ArrayList(Rule).init(allocator),
             .buttons = std.ArrayList(Button).init(allocator),
-            .target = Zone.init(allocator),
             .condition_indices = std.ArrayList(usize).init(allocator),
             .allocator = allocator,
             .arena = arena,
@@ -426,8 +542,11 @@ const Board = struct {
 
     pub fn deinit(self: *Self) void {
         self.cells.deinit();
+        self.start_state.deinit();
         for (self.zones.items) |*zone| zone.deinit();
         self.zones.deinit();
+        for (self.targets.items) |*zone| zone.deinit();
+        self.targets.deinit();
         for (self.rules.items) |*rule| rule.deinit();
         self.rules.deinit();
         self.condition_indices.deinit();
@@ -437,8 +556,8 @@ const Board = struct {
     pub fn serialize(self: *const Self, js: *serializer.JsonSerializer) !void {
         try serializer.serialize("width", self.width, js);
         try serializer.serialize("height", self.height, js);
-        try serializer.serialize("target", self.target, js);
         try serializer.serialize("zones", self.zones.items, js);
+        try serializer.serialize("targets", self.targets.items, js);
         try serializer.serialize("rules", self.rules.items, js);
         try serializer.serialize("cells", self.cells.items, js);
     }
@@ -450,10 +569,11 @@ const Board = struct {
         self.rules.clearRetainingCapacity();
         for (self.zones.items) |*zone| zone.deinit();
         self.zones.clearRetainingCapacity();
+        for (self.targets.items) |*zone| zone.deinit();
+        self.targets.clearRetainingCapacity();
         // load the things
         serializer.deserialize("width", &self.width, js, options);
         serializer.deserialize("height", &self.height, js, options);
-        serializer.deserialize("target", &self.target, js, options);
         for (js.object.get("cells").?.array.items) |val| {
             var cell: Cell = undefined;
             serializer.deserialize("", &cell, val, options);
@@ -469,11 +589,17 @@ const Board = struct {
             serializer.deserialize("", &zone, val, options);
             self.zones.append(zone) catch unreachable;
         }
+        for (js.object.get("targets").?.array.items) |val| {
+            var target = Zone.init(self.allocator);
+            serializer.deserialize("", &target, val, options);
+            self.targets.append(target) catch unreachable;
+        }
         // setup the position things
         self.setupBoardCellPositions();
         self.setupRulePositions();
         self.setupZonePositions();
         self.setupTargetPositions();
+        self.checkPermanent();
     }
 
     pub fn saveLevel(self: *Self) !void {
@@ -497,6 +623,16 @@ const Board = struct {
         c.debugPrint("loadLevel 3");
         self.deserialize(js.object.get("level").?, .{});
         c.debugPrint("loadLevel 4");
+    }
+
+    fn checkPermanent(self: *Self) void {
+        self.permanent_exists = false;
+        for (self.cells.items) |cell| {
+            if (cell.cell == .permanent) {
+                self.permanent_exists = true;
+                return;
+            }
+        }
     }
 
     fn setupBoardCellPositions(self: *Self) void {
@@ -531,9 +667,14 @@ const Board = struct {
     }
 
     fn setupTargetPositions(self: *Self) void {
-        const y: f32 = RULE_PANE_PADDING + BUTTON_HEIGHT + RULE_PANE_PADDING;
+        var y: f32 = RULE_PANE_PADDING + BUTTON_HEIGHT + RULE_PANE_PADDING;
         const x: f32 = (SCREEN_SIZE.x) - RULE_PANE_PADDING - BUTTON_WIDTH;
-        self.target.setupPositions(.{ .x = x, .y = y });
+        for (self.targets.items) |*target| {
+            target.setupPositions(.{ .x = x, .y = y });
+            y += RULE_PANE_PADDING;
+            y += @as(f32, @floatFromInt(target.height)) * (CELL_SIZE + CELL_PADDING);
+            y += CELL_PADDING;
+        }
     }
 
     fn setupZonePositions(self: *Self) void {
@@ -568,22 +709,17 @@ const Board = struct {
             zone.width = 3;
             zone.height = 3;
             zone.target_index = 10;
-            zone.setupPositions(.{ .x = (SCREEN_SIZE.x / 3) + RULE_PANE_PADDING, .y = RULE_PANE_PADDING });
             self.zones.append(zone) catch unreachable;
+            self.setupZonePositions();
         }
         c.debugPrint("board setup 4");
         {
-            self.target.width = 7;
-            self.target.height = 3;
+            var target = Zone.init(self.allocator);
+            target.width = 3;
+            target.height = 3;
+            target.target_index = 0;
+            self.targets.append(target) catch unreachable;
             self.setupTargetPositions();
-            c.debugPrint("board setup 4.1");
-            std.debug.assert(self.width >= 5);
-            self.target.target_index = 49;
-            self.target.cells.items[self.indexOf(1, 2).?].cell = .thing;
-            self.target.cells.items[self.indexOf(1, 3).?].cell = .thing;
-            self.target.cells.items[self.indexOf(1, 4).?].cell = .thing;
-            self.target.cells.items[self.indexOf(0, 3).?].cell = .thing;
-            self.target.cells.items[self.indexOf(2, 3).?].cell = .thing;
         }
         c.debugPrint("board setup 5");
         self.rules.append(Rule.init(self.allocator)) catch unreachable;
@@ -621,18 +757,21 @@ const Board = struct {
         self.rule_height = rule.height;
         if (rule.height > self.height) return;
         if (rule.width > self.width) return;
-        for (0..self.height - rule.height + 1) |row| {
-            for (0..self.width - rule.width + 1) |col| {
-                matches_condition: {
-                    for (0..rule.height) |y| {
-                        for (0..rule.width) |x| {
-                            const board_cell = self.cells.items[self.indexOf(row + y, col + x).?];
-                            const rule_cell = rule.condition.items[(y * rule.width) + x];
-                            // helpers.debugPrint("board[{d},{d}] = {s}. rule[{d},{d}] = {s}.", .{ row, col, @tagName(board_cell.cell), y, x, @tagName(rule_cell.cell) });
-                            if (board_cell.cell != rule_cell.cell) break :matches_condition;
+        find_area: {
+            for (0..self.height - rule.height + 1) |row| {
+                for (0..self.width - rule.width + 1) |col| {
+                    matches_condition: {
+                        for (0..rule.height) |y| {
+                            for (0..rule.width) |x| {
+                                const board_cell = self.cells.items[self.indexOf(row + y, col + x).?];
+                                const rule_cell = rule.condition.items[(y * rule.width) + x];
+                                // helpers.debugPrint("board[{d},{d}] = {s}. rule[{d},{d}] = {s}.", .{ row, col, @tagName(board_cell.cell), y, x, @tagName(rule_cell.cell) });
+                                if (board_cell.cell != rule_cell.cell) break :matches_condition;
+                            }
                         }
+                        self.condition_indices.append(self.indexOf(row, col).?) catch unreachable;
+                        break :find_area;
                     }
-                    self.condition_indices.append(self.indexOf(row, col).?) catch unreachable;
                 }
             }
         }
@@ -681,32 +820,41 @@ const Board = struct {
 
     fn checkCompletion(self: *Self) void {
         self.completed = true;
-        for (0..self.target.height) |row| {
-            for (0..self.target.width) |col| {
-                const index = (row * self.target.width) + col;
-                const board_index = self.target.target_index + (row * self.width) + col;
-                if (self.target.cells.items[index].cell != self.cells.items[board_index].cell) {
-                    self.completed = false;
-                    return;
+        for (self.targets.items) |target| {
+            for (0..target.height) |row| {
+                for (0..target.width) |col| {
+                    const index = (row * target.width) + col;
+                    const board_index = target.target_index + (row * self.width) + col;
+                    if (target.cells.items[index].cell != self.cells.items[board_index].cell) {
+                        self.completed = false;
+                        return;
+                    }
                 }
             }
         }
         self.sim_mode = .paused;
     }
 
+    fn loadStartState(self: *Self) void {
+        self.start_state.clearRetainingCapacity();
+        for (self.cells.items) |cell| self.start_state.append(cell.cell) catch unreachable;
+    }
+
     pub fn update(self: *Self, ticks: u64, arena: std.mem.Allocator, mouse: MouseState, editor: bool) void {
         self.ticks = ticks;
         self.arena = arena;
-        for (self.rules.items) |*rule| rule.update(mouse, editor);
-        for (self.zones.items) |*zone| zone.update(mouse, editor);
+        for (self.rules.items) |*rule| rule.update(mouse, editor, ticks, self.permanent_exists);
+        for (self.zones.items) |*zone| zone.update(mouse, editor, ticks);
         if (self.sim_step.atStart()) {
             for (self.zones.items) |*zone| {
                 self.updateFromZone(zone);
             }
+            self.loadStartState();
         }
         if (editor) {
             for (self.cells.items) |*cell| {
-                cell.update(mouse);
+                cell.update(mouse, ticks, true);
+                self.checkPermanent();
             }
             for (self.buttons.items) |*button| button.update(mouse);
             for (self.buttons.items) |button| {
@@ -733,11 +881,13 @@ const Board = struct {
             }
             if (zone_update) self.setupZonePositions();
             var target_update = false;
-            self.target.update(mouse, editor);
-            for (self.target.buttons.items) |button| {
-                if (button.clicked) {
-                    target_update = true;
-                    self.target.applyAction(button.value, self);
+            for (self.targets.items) |*target| {
+                target.update(mouse, editor, ticks);
+                for (target.buttons.items) |button| {
+                    if (button.clicked) {
+                        target_update = true;
+                        target.applyAction(button.value, self);
+                    }
                 }
             }
             if (target_update) self.setupTargetPositions();
@@ -771,6 +921,17 @@ const Board = struct {
                 var zone = self.zones.pop();
                 zone.deinit();
                 self.setupZonePositions();
+            },
+            .add_target => {
+                var target = Zone.init(self.allocator);
+                self.targets.append(target) catch unreachable;
+                self.setupTargetPositions();
+            },
+            .sub_target => {
+                if (self.targets.items.len == 0) return;
+                var target = self.targets.pop();
+                target.deinit();
+                self.setupTargetPositions();
             },
             .add_row => {
                 self.height += 1;
@@ -809,6 +970,7 @@ const Board = struct {
             const extra = desired - current;
             for (0..extra) |_| self.cells.append(.{ .cell = .blank, .button = undefined }) catch unreachable;
         }
+        self.loadStartState();
     }
 
     fn updateFromZone(self: *Self, zone: *const Zone) void {
@@ -824,6 +986,11 @@ const Board = struct {
         // in the next frame, update will take care of it
     }
 
+    pub fn toggleSim(self: *Self) void {
+        // we set to single step so that the current step gets completed.
+        if (self.sim_mode == .simming) self.sim_mode = .single_step else self.sim_mode = .simming;
+    }
+
     pub fn clearBoard(self: *Self) void {
         self.sim_step.reset();
         self.last_step_areas_found = 0;
@@ -831,13 +998,19 @@ const Board = struct {
         self.completed = false;
         self.condition_indices.clearRetainingCapacity();
     }
+
+    pub fn resetBoard(self: *Self) void {
+        self.clearBoard();
+        for (self.start_state.items, self.cells.items) |start, *cell| cell.cell = start;
+    }
 };
 
 const ButtonAction = enum {
-    clear_board,
+    reset_board,
     sub_step,
     single_step,
     start_sim,
+    clear_board,
     show_target,
 };
 
@@ -922,7 +1095,7 @@ pub const Game = struct {
             self.board.saveLevel() catch unreachable;
         }
         if (self.haathi.inputs.getKey(.l).is_clicked) {
-            self.board.loadLevel(LEVELS[1]);
+            self.board.loadLevel(LEVELS[0]);
         }
         if (true and self.haathi.inputs.getKey(.tab).is_clicked) {
             self.editor_mode = !self.editor_mode;
@@ -938,9 +1111,10 @@ pub const Game = struct {
     fn performAction(self: *Self, action: ButtonAction) void {
         switch (action) {
             .clear_board => self.board.clearBoard(),
+            .reset_board => self.board.resetBoard(),
             .sub_step => self.board.step(),
             .single_step => self.board.sim_mode = .single_step,
-            .start_sim => self.board.sim_mode = .simming,
+            .start_sim => self.board.toggleSim(),
             .show_target => {},
         }
     }
@@ -969,6 +1143,30 @@ pub const Game = struct {
                     .color = colors.endesga_grey2,
                     .radius = CELL_PADDING,
                 });
+                if (rule.fixed_condition) {
+                    const lock_pos = pos.add(.{ .x = -CELL_SIZE, .y = (size.y / 2) - (CELL_SIZE / 2) });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos,
+                        .size = .{ .x = 8, .y = 8 },
+                        .color = colors.endesga_grey2,
+                        .radius = 12,
+                        .centered = true,
+                    });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos,
+                        .size = .{ .x = 5, .y = 5 },
+                        .color = colors.endesga_grey1,
+                        .radius = 12,
+                        .centered = true,
+                    });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos.add(.{ .y = 6 }),
+                        .size = .{ .x = 12, .y = 12 },
+                        .color = colors.endesga_grey2,
+                        .radius = 2,
+                        .centered = true,
+                    });
+                }
             }
             {
                 const pos = rule.result.items[0].button.rect.position;
@@ -981,7 +1179,32 @@ pub const Game = struct {
                     .color = colors.endesga_grey2,
                     .radius = CELL_PADDING,
                 });
+                if (rule.fixed_result) {
+                    const lock_pos = pos.add(.{ .x = size.x + CELL_SIZE, .y = (size.y / 2) - (CELL_SIZE / 2) });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos,
+                        .size = .{ .x = 8, .y = 8 },
+                        .color = colors.endesga_grey2,
+                        .radius = 12,
+                        .centered = true,
+                    });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos,
+                        .size = .{ .x = 5, .y = 5 },
+                        .color = colors.endesga_grey1,
+                        .radius = 12,
+                        .centered = true,
+                    });
+                    self.haathi.drawRect(.{
+                        .position = lock_pos.add(.{ .y = 6 }),
+                        .size = .{ .x = 12, .y = 12 },
+                        .color = colors.endesga_grey2,
+                        .radius = 2,
+                        .centered = true,
+                    });
+                }
             }
+            // draw lock
             for (rule.condition.items) |cell| {
                 if (cell.button.hovered) {
                     self.haathi.drawRect(.{
@@ -1012,6 +1235,28 @@ pub const Game = struct {
                     .size = cell.button.rect.size,
                     .color = cell.cell.toColor(),
                     .radius = 2,
+                });
+            }
+            for (rule.player_buttons.items) |button| {
+                if (button.hovered) {
+                    self.haathi.drawRect(.{
+                        .position = button.rect.position.add(.{ .x = -4, .y = -4 }),
+                        .size = button.rect.size.add(.{ .x = 8, .y = 8 }),
+                        .color = colors.endesga_grey0,
+                        .radius = 9,
+                    });
+                }
+                self.haathi.drawRect(.{
+                    .position = button.rect.position,
+                    .size = button.rect.size,
+                    .color = colors.endesga_grey4,
+                    .radius = 5,
+                });
+                const text_color = colors.endesga_grey1;
+                self.haathi.drawText(.{
+                    .text = button.text,
+                    .position = button.rect.position.add(button.rect.size.scale(0.5)).add(.{ .y = 6 }),
+                    .color = text_color,
                 });
             }
             if (self.editor_mode) {
@@ -1157,8 +1402,7 @@ pub const Game = struct {
                 }
             }
         }
-        { // draw target things
-            const zone = self.board.target;
+        for (self.board.targets.items) |zone| { // draw target things
             const bg_color = colors.endesga_grey5.lerp(colors.endesga_grey2, 0.7);
             var points = self.arena.alloc(Vec2, 2) catch unreachable;
             {
@@ -1246,46 +1490,48 @@ pub const Game = struct {
             });
         }
         if (self.show_target or self.board.completed) {
-            const pos = self.board.cells.items[self.board.target.target_index].button.rect.position;
-            const width = (@as(f32, @floatFromInt(self.board.target.width)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
-            const height = (@as(f32, @floatFromInt(self.board.target.height)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
-            self.haathi.drawRect(.{
-                .position = pos.add(.{ .x = -BOARD_CELL_PADDING * 1, .y = -BOARD_CELL_PADDING * 1 }),
-                .size = .{ .x = width + (2 * BOARD_CELL_PADDING), .y = height + (2 * BOARD_CELL_PADDING) },
-                .color = colors.endesga_grey0,
-                .radius = 1,
-            });
-            self.haathi.drawRect(.{
-                .position = pos,
-                .size = .{ .x = width, .y = height },
-                .color = colors.endesga_grey2,
-                .radius = 1,
-            });
-            for (0..self.board.target.height) |row| {
-                for (0..self.board.target.width) |col| {
-                    const frow: f32 = @floatFromInt(row);
-                    const fcol: f32 = @floatFromInt(col);
-                    const index = (row * self.board.target.width) + col;
-                    const color = self.board.target.cells.items[index].cell.toColor();
-                    const cell_pos = pos.add(.{
-                        .x = fcol * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
-                        .y = frow * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
-                    });
-                    const is_error = self.board.target.cells.items[index].cell != self.board.cells.items[self.board.target.target_index + (self.board.width * row) + col].cell;
-                    if (is_error) {
+            for (self.board.targets.items) |target| {
+                const pos = self.board.cells.items[target.target_index].button.rect.position;
+                const width = (@as(f32, @floatFromInt(target.width)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
+                const height = (@as(f32, @floatFromInt(target.height)) * (BOARD_CELL_SIZE + BOARD_CELL_PADDING)) - BOARD_CELL_PADDING;
+                self.haathi.drawRect(.{
+                    .position = pos.add(.{ .x = -BOARD_CELL_PADDING * 1, .y = -BOARD_CELL_PADDING * 1 }),
+                    .size = .{ .x = width + (2 * BOARD_CELL_PADDING), .y = height + (2 * BOARD_CELL_PADDING) },
+                    .color = colors.endesga_grey0,
+                    .radius = 1,
+                });
+                self.haathi.drawRect(.{
+                    .position = pos,
+                    .size = .{ .x = width, .y = height },
+                    .color = colors.endesga_grey2,
+                    .radius = 1,
+                });
+                for (0..target.height) |row| {
+                    for (0..target.width) |col| {
+                        const frow: f32 = @floatFromInt(row);
+                        const fcol: f32 = @floatFromInt(col);
+                        const index = (row * target.width) + col;
+                        const color = target.cells.items[index].cell.toColor();
+                        const cell_pos = pos.add(.{
+                            .x = fcol * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
+                            .y = frow * (BOARD_CELL_PADDING + BOARD_CELL_SIZE),
+                        });
+                        const is_error = target.cells.items[index].cell != self.board.cells.items[target.target_index + (self.board.width * row) + col].cell;
+                        if (is_error) {
+                            self.haathi.drawRect(.{
+                                .position = cell_pos.add(.{ .x = -BOARD_CELL_PADDING, .y = -BOARD_CELL_PADDING }),
+                                .size = .{ .x = BOARD_CELL_SIZE + (2 * BOARD_CELL_PADDING), .y = BOARD_CELL_SIZE + (2 * BOARD_CELL_PADDING) },
+                                .color = colors.endesga_red0,
+                                .radius = 1,
+                            });
+                        }
                         self.haathi.drawRect(.{
-                            .position = cell_pos.add(.{ .x = -BOARD_CELL_PADDING, .y = -BOARD_CELL_PADDING }),
-                            .size = .{ .x = BOARD_CELL_SIZE + (2 * BOARD_CELL_PADDING), .y = BOARD_CELL_SIZE + (2 * BOARD_CELL_PADDING) },
-                            .color = colors.endesga_red0,
+                            .position = cell_pos,
+                            .size = .{ .x = BOARD_CELL_SIZE, .y = BOARD_CELL_SIZE },
+                            .color = color,
                             .radius = 1,
                         });
                     }
-                    self.haathi.drawRect(.{
-                        .position = cell_pos,
-                        .size = .{ .x = BOARD_CELL_SIZE, .y = BOARD_CELL_SIZE },
-                        .color = color,
-                        .radius = 1,
-                    });
                 }
             }
         }
