@@ -9,6 +9,7 @@ pub fn build(b: *std.build.Builder) void {
     if (b.option(bool, "charger", "Build Charger Game")) |_| jam_game_builder(b, .charger);
     if (b.option(bool, "holiday", "Build holiday Game")) |_| jam_game_builder(b, .holiday);
     if (b.option(bool, "cellular", "Build Cellular Game")) |_| jam_game_builder(b, .cellular);
+    if (b.option(bool, "sprite", "Build Sprite Test")) |_| jam_game_builder(b, .sprite);
 }
 
 pub const Game = enum {
@@ -19,6 +20,7 @@ pub const Game = enum {
     charger,
     holiday,
     cellular,
+    sprite,
 };
 
 fn font_builder(b: *std.build.Builder) void {

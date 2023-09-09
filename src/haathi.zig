@@ -149,6 +149,14 @@ pub const Haathi = struct {
                     c.textAlign(@tagName(text.alignment).ptr);
                     c.fillText(text.text.ptr, text.position.x, text.position.y, text.width);
                 },
+                .sprite => |sprite| {
+                    if (true) {
+                        const sx = sprite.sprite.anchor.x + sprite.sprite.size.x;
+                        c.drawImage(sprite.sprite.path[0..].ptr, sx, sprite.sprite.anchor.y, -sprite.sprite.size.x, sprite.sprite.size.y, sprite.position.x, sprite.position.y, sprite.sprite.size.x * sprite.scale, sprite.sprite.size.y * sprite.scale);
+                    } else {
+                        c.drawImage(sprite.sprite.path[0..].ptr, sprite.sprite.anchor.x, sprite.sprite.anchor.y, sprite.sprite.size.x, sprite.sprite.size.y, sprite.position.x, sprite.position.y, sprite.sprite.size.x * sprite.scale, sprite.sprite.size.y * sprite.scale);
+                    }
+                },
             }
         }
         self.drawables.clearRetainingCapacity();
@@ -167,9 +175,29 @@ pub const Haathi = struct {
     pub fn drawText(self: *Self, text: DrawTextOptions) void {
         self.drawables.append(.{ .text = text }) catch unreachable;
     }
+    pub fn drawSprite(self: *Self, sprite: DrawSpriteOptions) void {
+        self.drawables.append(.{ .sprite = sprite }) catch unreachable;
+    }
     pub fn setCursor(self: *Self, cursor: CursorStyle) void {
         _ = self;
         c.setCursor(@tagName(cursor).ptr);
+    }
+
+    pub fn loadSound(self: *Self, sound_path: []const u8, looping: bool) void {
+        _ = self;
+        c.loadSound(sound_path[0..].ptr, looping);
+    }
+    pub fn playSound(self: *Self, sound_path: []const u8, restart: bool) void {
+        _ = self;
+        c.playSound(sound_path[0..].ptr, restart);
+    }
+    pub fn pauseSound(self: *Self, sound_path: []const u8) void {
+        _ = self;
+        c.pauseSound(sound_path[0..].ptr);
+    }
+    pub fn setSoundVolume(self: *Self, sound_path: []const u8, volume: f32) void {
+        _ = self;
+        c.setSoundVolume(sound_path[0..].ptr, volume);
     }
 };
 
@@ -178,6 +206,7 @@ pub const Drawable = union(enum) {
     path: DrawPathOptions,
     text: DrawTextOptions,
     poly: DrawPolyOptions,
+    sprite: DrawSpriteOptions,
 };
 
 pub const DrawRectOptions = struct {
@@ -216,4 +245,22 @@ pub const DrawTextOptions = struct {
     style: []const u8 = FONT_1,
     width: f32 = 1280,
     alignment: TextAlignment = .center,
+};
+
+const SpriteAnchor = enum {
+    top_left,
+    center,
+};
+
+pub const Sprite = struct {
+    path: []const u8,
+    anchor: Vec2,
+    size: Vec2,
+};
+
+pub const DrawSpriteOptions = struct {
+    sprite: Sprite,
+    position: Vec2,
+    scale: f32 = 1,
+    anchor: SpriteAnchor = .top_left,
 };

@@ -10,6 +10,7 @@ const Game = switch (build_options.game) {
     .charger => @import("charger.zig").Game,
     .holiday => @import("holiday.zig").Game,
     .cellular => @import("cellular.zig").Game,
+    .sprite => @import("sprite.zig").Game,
 };
 const helpers = @import("helpers.zig");
 

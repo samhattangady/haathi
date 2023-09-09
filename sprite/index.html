@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>haathi</title>
+</head>
+
+<body>
+  <div class="page">
+    <div class="container">
+      <div class="col">
+        <div class="wrapper">
+          <canvas id="haathi_canvas" width="1280" height="720" style="background: #ccc;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="haathi.js"></script>
+
+  <script>
+    const env = { ...api };
+    document.addEventListener('contextmenu', event => event.preventDefault());
+
+    fetchAndInstantiate('haathi.wasm', { env }).then(instance => {
+      memory = instance.exports.memory;
+      instance.exports.init();
+      document.addEventListener('keydown', e => instance.exports.keyDown(getKeycode(e.key)));
+      document.addEventListener('keyup', e => instance.exports.keyUp(getKeycode(e.key)));
+      document.addEventListener('mousedown', e => instance.exports.mouseDown(e.button));
+      document.addEventListener('mouseup', e => instance.exports.mouseUp(e.button));
+      document.addEventListener('mousemove', e => instance.exports.mouseMove(e.x, e.y));
+      document.addEventListener('wheel', e => instance.exports.mouseWheelY(e.deltaY));
+
+      function render() {
+        instance.exports.render();
+        window.requestAnimationFrame(render);
+      }
+      window.requestAnimationFrame(render);
+    });
+
+    function fetchAndInstantiate(url, importObject) {
+      return fetch(url)
+        .then(response => response.arrayBuffer())
+        .then(bytes => WebAssembly.instantiate(bytes, importObject))
+        .then(results => results.instance);
+    }
+
+  </script>
+
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+    }
+    html {
+      padding: 0;
+      margin: 0;
+    }
+    @font-face {
+      font-family: 'JetBrainsMono';
+      src: url('fonts/JetBrainsMono-SemiBold.ttf');
+    }
+  </style>
+
+</body>
+
+</html>

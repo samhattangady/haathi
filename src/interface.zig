@@ -17,3 +17,8 @@ pub extern fn font(font: [*]const u8) void;
 pub extern fn fillText(text: [*]const u8, x: f32, y: f32, width: f32) void;
 pub extern fn textAlign(alignment: [*]const u8) void;
 pub extern fn setCursor(style: [*]const u8) void;
+pub extern fn drawImage(path: [*]const u8, sx: f32, sy: f32, sw: f32, sh: f32, dx: f32, dy: f32, dw: f32, dh: f32) void;
+pub extern fn loadSound(path: [*]const u8, loop: bool) void;
+pub extern fn playSound(path: [*]const u8, restart: bool) void;
+pub extern fn pauseSound(path: [*]const u8) void;
+pub extern fn setSoundVolume(path: [*]const u8, volume: f32) void;
