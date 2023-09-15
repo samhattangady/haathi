@@ -1001,3 +1001,14 @@ Lets move in all the points from yesterday that were not completed.
 
 And now, start off with level design. =*
 Do we have any ideas that we would like to try out?
+
+---
+
+15 Sep 2023:
+Working on the byog jam.
+
+Trying to figure out the first prototype that we want to have. So we should
+probably have players and cards, and then play out the effects.
+
+So we should have a target that the ball needs to reach to along with a
+player. That's the level solution.

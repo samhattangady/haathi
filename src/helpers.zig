@@ -232,6 +232,28 @@ pub const Vec4 = struct {
     }
 };
 
+pub const Movement = struct {
+    const Self = @This();
+    from: Vec2,
+    to: Vec2,
+    start: u64,
+    duration: u64,
+    mode: enum {
+        linear,
+        eased,
+    } = .linear,
+
+    pub fn getPos(self: *const Self, ticks: u64) Vec2 {
+        if (ticks < self.start) return self.from;
+        if (ticks > (self.start + self.duration)) return self.to;
+        const t: f32 = @as(f32, @floatFromInt(ticks - self.start)) / @as(f32, @floatFromInt(self.duration));
+        switch (self.mode) {
+            .linear => return self.from.lerp(self.to, t),
+            .eased => return self.from.ease(self.to, t),
+        }
+    }
+};
+
 pub const Rect = struct {
     const Self = @This();
     position: Vec2,

@@ -150,12 +150,8 @@ pub const Haathi = struct {
                     c.fillText(text.text.ptr, text.position.x, text.position.y, text.width);
                 },
                 .sprite => |sprite| {
-                    if (true) {
-                        const sx = sprite.sprite.anchor.x + sprite.sprite.size.x;
-                        c.drawImage(sprite.sprite.path[0..].ptr, sx, sprite.sprite.anchor.y, -sprite.sprite.size.x, sprite.sprite.size.y, sprite.position.x, sprite.position.y, sprite.sprite.size.x * sprite.scale, sprite.sprite.size.y * sprite.scale);
-                    } else {
-                        c.drawImage(sprite.sprite.path[0..].ptr, sprite.sprite.anchor.x, sprite.sprite.anchor.y, sprite.sprite.size.x, sprite.sprite.size.y, sprite.position.x, sprite.position.y, sprite.sprite.size.x * sprite.scale, sprite.sprite.size.y * sprite.scale);
-                    }
+                    const sx = sprite.sprite.anchor.x;
+                    c.drawImage(sprite.sprite.path[0..].ptr, sx, sprite.sprite.anchor.y, sprite.sprite.size.x, sprite.sprite.size.y, sprite.position.x, sprite.position.y, sprite.sprite.size.x * sprite.scale.x, sprite.sprite.size.y * sprite.scale.y);
                 },
             }
         }
@@ -261,6 +257,6 @@ pub const Sprite = struct {
 pub const DrawSpriteOptions = struct {
     sprite: Sprite,
     position: Vec2,
-    scale: f32 = 1,
+    scale: Vec2 = .{ .x = 1, .y = 1 },
     anchor: SpriteAnchor = .top_left,
 };
