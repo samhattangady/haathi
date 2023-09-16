@@ -161,6 +161,17 @@ pub const Vec2i = struct {
     pub fn equal(v: *const Self, v1: Self) bool {
         return v.x == v1.x and v.y == v1.y;
     }
+
+    pub fn numSteps(v: *const Self) i32 {
+        const absx = std.math.absInt(v.x) catch unreachable;
+        const absy = std.math.absInt(v.y) catch unreachable;
+        return absx + absy;
+    }
+    pub fn maxMag(v: *const Self) i32 {
+        const absx = std.math.absInt(v.x) catch unreachable;
+        const absy = std.math.absInt(v.y) catch unreachable;
+        return @max(absx, absy);
+    }
 };
 
 pub const Vec3 = struct {

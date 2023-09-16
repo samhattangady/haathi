@@ -1012,3 +1012,10 @@ probably have players and cards, and then play out the effects.
 
 So we should have a target that the ball needs to reach to along with a
 player. That's the level solution.
+
+---
+
+16 Sep 2023:
+New day. New chance.
+Lets figure out what we can do. Let's just create a full level now. Then see
+about the rest.

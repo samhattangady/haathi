@@ -1,4 +1,8 @@
+const helpers = @import("helpers.zig");
+const Vec2 = helpers.Vec2;
 const Sprite = @import("haathi.zig").Sprite;
+
+pub const BLANK = Sprite{ .path = "sprites/pointer.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 0, .y = 0 } };
 pub const POINTER = Sprite{ .path = "sprites/pointer.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } };
 pub const TERRAIN_SPRITES = [_]Sprite{
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
@@ -127,3 +131,131 @@ pub fn blue_player(moving: bool) [6]Sprite {
         BLUE_PLAYER[31],
     };
 }
+
+const RED_PLAYER = [_]Sprite{
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 0, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 192, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 384, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 576, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 768, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 192 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 384 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 576 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 768 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Pawn_Red.png", .anchor = .{ .x = 960, .y = 960 }, .size = .{ .x = 192, .y = 192 } },
+};
+
+pub fn red_player(moving: bool) [6]Sprite {
+    if (!moving) return [6]Sprite{
+        RED_PLAYER[30],
+        RED_PLAYER[24],
+        RED_PLAYER[18],
+        RED_PLAYER[12],
+        RED_PLAYER[6],
+        RED_PLAYER[0],
+    } else return [6]Sprite{
+        RED_PLAYER[1],
+        RED_PLAYER[7],
+        RED_PLAYER[13],
+        RED_PLAYER[19],
+        RED_PLAYER[25],
+        RED_PLAYER[31],
+    };
+}
+
+pub const TARGETS = [_]Sprite{
+    .{ .path = "sprites/marker_1.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/marker_2.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/marker_3.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/marker_4.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+};
+pub const TARGET_OFFSETS = [_]Vec2{
+    .{ .x = -32, .y = -32 },
+    .{ .x = 32, .y = -32 },
+    .{ .x = -32, .y = 32 },
+    .{ .x = 32, .y = 32 },
+};
+
+pub const FOAM = [_]Sprite{
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 0 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 1 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 2 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 3 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 4 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 5 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 6 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+    .{ .path = "sprites/Foam.png", .anchor = .{ .x = 7 * 192, .y = 0 }, .size = .{ .x = 192, .y = 192 } },
+};
+pub const BALL = [_]Sprite{
+    .{ .path = "sprites/Ball.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Ball.png", .anchor = .{ .x = 64, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+};
+
+pub const BANNERS = [_]Sprite{
+    // folds on left and right - top
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 192, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 256, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 512, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    // folds on left and right - mid
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 192, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 256, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 512, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    // folds on left and right - mid
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 192, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 256, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners.png", .anchor = .{ .x = 512, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+};
+
+pub const BANNERS_SHADOW = [_]Sprite{
+    // folds on left and right - top
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 192, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 256, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 512, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    // folds on left and right - mid
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 192, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 256, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 512, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    // folds on left and right - mid
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 192, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 256, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Banners_Shadow.png", .anchor = .{ .x = 512, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+};
+pub const BUTTONS = [_]Sprite{
+    .{ .path = "sprites/Button_Red.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_Pressed.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides.png", .anchor = .{ .x = 64, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides.png", .anchor = .{ .x = 128, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides_Pressed.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides_Pressed.png", .anchor = .{ .x = 64, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Red_3Slides_Pressed.png", .anchor = .{ .x = 128, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 64, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 128, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+};
