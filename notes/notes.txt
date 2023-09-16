@@ -1019,3 +1019,37 @@ player. That's the level solution.
 New day. New chance.
 Lets figure out what we can do. Let's just create a full level now. Then see
 about the rest.
+
+Okay. Let's try to get some game out of this now. This session, no more
+polish. Just get something working. Ideally, by the end of the day, we want to
+have multiple levels loading. The whole system to create levels and stuffs. We
+also have to get the opponents working.
+
+So lets make a level where we have to kick the ball around an opponent, and
+then go and get it.
+
+Main tasks remaining:
+[ ] Setup menu, and levels screen, and tech for the story progression
+[ ] mechanics
+    [ ] sheep?
+    [ ] rocks reflections?
+    [ ] sand / impassable terrain?
+    [ ] opponents that move?
+    [ ] out of bounds
+[ ] create levels
+[ ] polish the tokens - text or icons.
+
+Okay. How do we want the mechanics to work? Rock reflections makes sense I
+think. And how do we want sheep to work?
+
+Or do we want to change out the controls? Maybe we can use wasd to move, and
+then cards to kick? I like the cards gameplay, but I don't really have too
+many ideas for how it could all work out. We need some kind of dynamics,
+either moving sheep or opponents or something.
+
+Or we could just have rocks on the field where players cannot dribble? I think
+the rock reflections is the best idea.
+
+Okay, for rocks, we need to check
+1. if ball hits it, and still has momentum, it should reflect. So the current
+rocks is not going to work. We need to implement it with elevation in mind.

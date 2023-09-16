@@ -33,6 +33,10 @@ const POINTER_OFFSET = Vec2{ .x = -22, .y = -17 };
 const STEP_DURATION = 300;
 const BALL_DELAY = 80;
 
+const LEVELS = [_][]const u8{
+    "size|12|7 ball|3|3 target|9|3 player|2|3|player player|4|5|player player|7|3|opponent card|kick|3|3 card|move|1|1 card|kick|2|2 card|dribble|2|-1 card|dribble|3|0 cell|rock|4|6",
+};
+
 const Team = enum {
     player,
     opponent,
@@ -45,6 +49,7 @@ const Player = struct {
     position: Vec2 = .{},
     last_sprite_update_tick: u64 = 0,
     sprite_index: usize = 0,
+    swing_animation: bool = false,
     sprite_sheet: [6]Sprite = undefined,
     sprite: Sprite = undefined,
 
@@ -66,12 +71,22 @@ const Player = struct {
                 .opponent => self.sprite_sheet = sprites.red_player(false),
             }
         }
+        if (self.swing_animation) self.sprite_sheet = sprites.player_swing();
         if (ticks - self.last_sprite_update_tick > 100) {
             self.sprite_index += 1;
             self.last_sprite_update_tick = ticks;
         }
-        if (self.sprite_index == 6) self.sprite_index = 0;
+        if (self.sprite_index == 6) {
+            self.sprite_index = 0;
+            self.swing_animation = false;
+        }
         self.sprite = self.sprite_sheet[self.sprite_index];
+    }
+
+    pub fn swingAnimation(self: *Self) void {
+        // TODO (16 Sep 2023 sam): add delay before starting animation
+        self.swing_animation = true;
+        self.sprite_index = 0;
     }
 
     pub fn moveBy(self: *Self, ticks: u64, change: Vec2i) void {
@@ -82,6 +97,22 @@ const Player = struct {
         const dy: f32 = @floatFromInt(change.y);
         const dest = self.position.add(.{ .x = (CELL_WIDTH + CELL_PADDING_X) * dx, .y = (CELL_HEIGHT + CELL_PADDING_Y) * -dy });
         self.movement = .{ .from = self.position, .to = dest, .start = ticks + (BALL_DELAY * duration_mul), .duration = (STEP_DURATION - BALL_DELAY) * duration_mul };
+    }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.address.x = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+            if (count == 3) self.address.y = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+            if (count == 4) self.team = std.meta.stringToEnum(Team, tok).?;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []u8 {
+        return std.fmt.allocPrintZ(arena, "player|{d}|{d}|{s}", .{ self.address.x, self.address.y, @tagName(self.team) }) catch unreachable;
     }
 };
 
@@ -115,13 +146,36 @@ const Ball = struct {
         const dest = self.position.add(.{ .x = (CELL_WIDTH + CELL_PADDING_X) * dx, .y = (CELL_HEIGHT + CELL_PADDING_Y) * -dy });
         self.movement = .{ .from = self.position, .to = dest, .start = ticks, .duration = (STEP_DURATION - BALL_DELAY) * duration_mul };
     }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.address.x = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+            if (count == 3) self.address.y = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []u8 {
+        return std.fmt.allocPrintZ(arena, "ball|{d}|{d}", .{ self.address.x, self.address.y }) catch unreachable;
+    }
+};
+
+const CellType = enum {
+    empty,
+    sand,
+    rock,
 };
 
 const Cell = struct {
     const Self = @This();
+    cell: CellType = .empty,
     address: Vec2i = .{},
     position: Vec2 = .{},
-    sprite: Sprite = undefined,
+    sprites_mem: [4]Drawable = undefined,
+    sprites: []Drawable = undefined,
 
     // based on the size, since we know the address, we can load the sprite.
     pub fn initSprite(self: *Self, width: usize, height: usize) void {
@@ -129,19 +183,44 @@ const Cell = struct {
         const down = self.address.y == 0;
         const left = self.address.x == 0;
         const right = self.address.x == width - 1;
-        self.sprite = sprites.terrain_grass(up, down, left, right);
+        self.sprites_mem[0] = .{ .sprite = sprites.terrain_grass(up, down, left, right) };
+        self.sprites = self.sprites_mem[0..1];
+        if (self.cell == .rock) {
+            self.sprites_mem[1] = .{ .sprite = sprites.ELEVATION[0], .position = .{ .y = -64 } };
+            self.sprites_mem[2] = .{ .sprite = sprites.terrain_grass(true, true, true, true), .position = .{ .y = -64 } };
+            self.sprites_mem[3] = .{ .sprite = sprites.TERRAIN_SPRITES[32] };
+            self.sprites = self.sprites_mem[0..4];
+        }
     }
 
     pub fn deinit(self: *Self) void {
         _ = self;
     }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        c.debugPrint(str.ptr);
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.cell = std.meta.stringToEnum(CellType, tok).?;
+            if (count == 3) self.address.x = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+            if (count == 4) self.address.y = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []u8 {
+        if (self.cell == .empty) return "";
+        return std.fmt.allocPrintZ(arena, "cell|{s}|{d}|{d}", .{ @tagName(self.cell), self.address.x, self.address.y }) catch unreachable;
+    }
 };
 
-const CardEffect = union(enum) {
+const CardEffect = enum {
     const Self = @This();
-    move: Vec2i,
-    kick: Vec2i,
-    dribble: Vec2i,
+    move,
+    kick,
+    dribble,
 
     pub fn playerMove(self: *const Self) bool {
         return switch (self.*) {
@@ -159,17 +238,24 @@ const CardEffect = union(enum) {
 };
 const Card = struct {
     const Self = @This();
-    effect: CardEffect,
-    rect: Rect,
+    effect: CardEffect = undefined,
+    direction: Vec2i = .{},
+    rect: Rect = undefined,
     movement: ?Movement = null,
     // the sprites will contain the offsets at position
     sprites: [8]Drawable = [_]Drawable{.{}} ** 8,
+    used: bool = false,
+    original_pos: Vec2 = .{},
+    buffer: [16]u8 = undefined,
+    text: []u8 = undefined,
 
     pub fn deinit(self: *Self) void {
         _ = self;
     }
 
     pub fn initSprites(self: *Self) void {
+        self.original_pos = self.rect.position;
+        self.fillCardText();
         // shadow first
         self.sprites[0] = .{ .sprite = sprites.BUTTONS[8], .position = .{} };
         self.sprites[1] = .{ .sprite = sprites.BUTTONS[9], .position = .{ .x = 64 } };
@@ -193,11 +279,30 @@ const Card = struct {
         }
     }
 
+    fn fillCardText(self: *Self) void {
+        var index: usize = 0;
+        const dir = self.direction;
+        const xmax = std.math.absInt(dir.x) catch unreachable;
+        const ymax = std.math.absInt(dir.y) catch unreachable;
+        for (0..@as(usize, @intCast(xmax))) |_| {
+            const char: u8 = if (dir.x > 0) 'r' else 'l';
+            self.buffer[index] = char;
+            index += 1;
+        }
+        for (0..@as(usize, @intCast(ymax))) |_| {
+            const char: u8 = if (dir.y > 0) 'u' else 'd';
+            self.buffer[index] = char;
+            index += 1;
+        }
+        self.text = self.buffer[0..index];
+    }
+
     pub fn moveTo(self: *Self, ticks: u64, pos: Vec2, duration: u64) void {
         self.movement = .{ .from = self.rect.position, .to = pos, .start = ticks, .duration = duration };
     }
 
     pub fn update(self: *Self, ticks: u64, mouse: MouseState) void {
+        // TODO (16 Sep 2023 sam): Convert to pressed only when playable?
         if (self.movement) |move| {
             self.rect.position = move.getPos(ticks);
             if (ticks > (move.start + move.duration)) self.movement = null;
@@ -215,6 +320,24 @@ const Card = struct {
         for (self.sprites[3..6]) |*sprite| sprite.position.y = y_offset;
         self.sprites[6].position = PLAYER_SPRITE_OFFSET.scale(0.7).add(.{ .x = 24, .y = y_offset - 8 });
         self.sprites[7].position = .{ .x = 24, .y = y_offset - 8 };
+    }
+
+    pub fn deserialize(self: *Self, str: []const u8) void {
+        c.debugPrint(str.ptr);
+        var tokens = std.mem.split(u8, str, "|");
+        var count: usize = 0;
+        while (tokens.next()) |tok| {
+            count += 1;
+            if (count == 1) continue;
+            if (count == 2) self.effect = std.meta.stringToEnum(CardEffect, tok).?;
+            if (count == 3) self.direction.x = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+            if (count == 4) self.direction.y = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+        }
+    }
+
+    pub fn serialize(self: *const Self, arena: std.mem.Allocator) []u8 {
+        const dir = self.direction;
+        return std.fmt.allocPrintZ(arena, "card|{s}|{d}|{d}", .{ @tagName(self.effect), dir.x, dir.y }) catch unreachable;
     }
 };
 const StateData = union(enum) {
@@ -245,6 +368,8 @@ const Field = struct {
     cells: std.ArrayList(Cell),
     cards: std.ArrayList(Card),
     ball: Ball,
+    failed: bool = false,
+    completed: bool = false,
     target: Vec2i = .{},
     state: StateData = .{ .idle = .{} },
     bg_sprites: std.ArrayList(Drawable),
@@ -285,45 +410,18 @@ const Field = struct {
         self.width = 12;
         self.height = 7;
         self.setupCells(self.width, self.height);
-        const player_address = Vec2i{ .x = 2, .y = 3 };
-        self.players.append(.{ .position = self.getPosOf(player_address), .address = player_address }) catch unreachable;
+        {
+            const player_address = Vec2i{ .x = 2, .y = 3 };
+            self.players.append(.{ .position = self.getPosOf(player_address), .address = player_address }) catch unreachable;
+        }
+        {
+            const player_address = Vec2i{ .x = 4, .y = 4 };
+            self.players.append(.{ .position = self.getPosOf(player_address), .address = player_address }) catch unreachable;
+        }
         const opp_address = Vec2i{ .x = 7, .y = 3 };
         self.players.append(.{ .position = self.getPosOf(opp_address), .address = opp_address, .team = .opponent }) catch unreachable;
-        self.cards.append(.{
-            .effect = .{ .move = .{ .x = 1 } },
-            .rect = .{
-                .size = .{ .x = 192, .y = 64 },
-                .position = .{
-                    .x = PANE_X_PADDING + 64,
-                    .y = TOKEN_PADDING + 64,
-                },
-            },
-        }) catch unreachable;
-        self.cards.append(.{
-            .effect = .{ .kick = .{ .x = 1 } },
-            .rect = .{
-                .size = .{ .x = 192, .y = 64 },
-                .position = .{
-                    .x = PANE_X_PADDING + 64,
-                    .y = TOKEN_PADDING + 64 + (64 * 1),
-                },
-            },
-        }) catch unreachable;
-        self.cards.append(.{
-            .effect = .{ .dribble = .{ .x = 1 } },
-            .rect = .{
-                .size = .{ .x = 192, .y = 64 },
-                .position = .{
-                    .x = PANE_X_PADDING + 64,
-                    .y = TOKEN_PADDING + 64 + (64 * 2),
-                },
-            },
-        }) catch unreachable;
         for (self.cards.items) |*card| card.initSprites();
-        self.target = .{ .x = 5, .y = 2 };
-        for (self.cells.items) |cell| {
-            self.bg_sprites.append(.{ .sprite = sprites.FOAM[0], .position = cell.position.add(.{ .x = -CELL_WIDTH, .y = -CELL_HEIGHT }) }) catch unreachable;
-        }
+        self.target = .{ .x = 9, .y = 3 };
         const ball_address = Vec2i{ .x = 3, .y = 3 };
         self.ball.address = ball_address;
         self.ball.position = self.getPosOf(ball_address);
@@ -364,6 +462,109 @@ const Field = struct {
         for (self.pane.items) |*pane| pane.position.x += PANE_X_PADDING;
     }
 
+    fn deserialize(self: *Self, str: []const u8) void {
+        self.failed = false;
+        self.completed = false;
+        self.players.clearRetainingCapacity();
+        self.cells.clearRetainingCapacity();
+        self.cards.clearRetainingCapacity();
+        var tokens = std.mem.split(u8, str, " ");
+        while (tokens.next()) |token| {
+            if (std.mem.eql(u8, token[0..4], "ball")) {
+                self.ball.deserialize(token);
+            }
+            if (std.mem.eql(u8, token[0..6], "player")) {
+                var player: Player = .{};
+                player.deserialize(token);
+                player.position = self.getPosOf(player.address);
+                self.players.append(player) catch unreachable;
+            }
+            if (std.mem.eql(u8, token[0..4], "card")) {
+                var card: Card = .{};
+                card.deserialize(token);
+                self.cards.append(card) catch unreachable;
+            }
+            if (std.mem.eql(u8, token[0..4], "size")) {
+                var toks = std.mem.split(u8, token, "|");
+                var count: usize = 0;
+                while (toks.next()) |tok| {
+                    count += 1;
+                    if (count == 1) continue;
+                    if (count == 2) self.width = std.fmt.parseInt(usize, tok, 10) catch unreachable;
+                    if (count == 3) self.height = std.fmt.parseInt(usize, tok, 10) catch unreachable;
+                }
+                self.setupCells(self.width, self.height);
+            }
+            // TODO (16 Sep 2023 sam): deserialize target
+            if (std.mem.eql(u8, token[0..4], "cell")) {
+                var address: Vec2i = .{};
+                var toks = std.mem.split(u8, token, "|");
+                var count: usize = 0;
+                while (toks.next()) |tok| {
+                    count += 1;
+                    if (count == 3) address.x = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+                    if (count == 4) address.y = std.fmt.parseInt(i32, tok, 10) catch unreachable;
+                }
+                var cell = self.getCellAt(address).?;
+                cell.deserialize(token);
+                cell.initSprite(self.width, self.height);
+            }
+        }
+        self.ball.position = self.getPosOf(self.ball.address);
+        self.setupCards();
+    }
+
+    fn setupCards(self: *Self) void {
+        for (self.cards.items, 0..) |*card, i| {
+            const fi: f32 = @floatFromInt(i);
+            card.rect = .{
+                .size = .{ .x = 192, .y = 64 },
+                .position = .{
+                    .x = PANE_X_PADDING + 64,
+                    .y = TOKEN_PADDING + 64 + (64 * fi),
+                },
+            };
+            card.initSprites();
+        }
+    }
+
+    fn serialize(self: *Self) void {
+        var string = std.ArrayList(u8).init(self.arena);
+        {
+            var tok = std.fmt.allocPrint(self.arena, "size|{d}|{d}", .{ self.width, self.height }) catch unreachable;
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        {
+            var tok = self.ball.serialize(self.arena);
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        {
+            var tok = std.fmt.allocPrint(self.arena, "target|{d}|{d}", .{ self.target.x, self.target.y }) catch unreachable;
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        for (self.players.items) |player| {
+            var tok = player.serialize(self.arena);
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        for (self.cards.items) |card| {
+            var tok = card.serialize(self.arena);
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        for (self.cells.items) |cell| {
+            var tok = cell.serialize(self.arena);
+            if (tok.len == 0) continue;
+            string.appendSlice(tok) catch unreachable;
+            string.append(' ') catch unreachable;
+        }
+        string.append(0) catch unreachable;
+        helpers.debugPrint("{s}", .{string.items});
+    }
+
     fn setupCells(self: *Self, width: usize, height: usize) void {
         for (self.cells.items) |*cell| cell.deinit();
         self.cells.clearRetainingCapacity();
@@ -380,6 +581,10 @@ const Field = struct {
                 self.cells.append(.{ .position = position, .address = .{ .x = @intCast(x), .y = @intCast(y) } }) catch unreachable;
                 self.cells.items[self.cells.items.len - 1].initSprite(width, height);
             }
+        }
+        self.bg_sprites.clearRetainingCapacity();
+        for (self.cells.items) |cell| {
+            self.bg_sprites.append(.{ .sprite = sprites.FOAM[0], .position = cell.position.add(.{ .x = -CELL_WIDTH, .y = -CELL_HEIGHT }) }) catch unreachable;
         }
     }
 
@@ -406,6 +611,13 @@ const Field = struct {
         return null;
     }
 
+    fn getCellAt(self: *Self, address: Vec2i) ?*Cell {
+        for (self.cells.items) |*cell| {
+            if (cell.address.equal(address)) return cell;
+        }
+        return null;
+    }
+
     pub fn getPosOf(self: *Self, address: Vec2i) Vec2 {
         // TODO (16 Sep 2023 sam): Should we calculate this?
         for (self.cells.items) |*cell| {
@@ -415,13 +627,55 @@ const Field = struct {
     }
 
     fn maybePlayCard(self: *Self, card_index: usize, cell_index: usize) void {
-        if (self.playerAt(self.cells.items[cell_index].address)) |player| {
-            switch (self.cards.items[card_index].effect) {
-                .move => |data| {
-                    player.moveBy(self.ticks, data);
+        var used = false;
+        const cell = self.cells.items[cell_index];
+        if (self.playerAt(cell.address)) |player| {
+            const card = self.cards.items[card_index];
+            switch (card.effect) {
+                .move => {
+                    player.moveBy(self.ticks, card.direction);
+                    used = true;
                 },
-                .kick => {},
-                .dribble => {},
+                .kick => {
+                    if (self.ball.address.equal(cell.address)) {
+                        self.ball.moveBy(self.ticks, card.direction);
+                        used = true;
+                    }
+                },
+                .dribble => {
+                    if (self.ball.address.equal(cell.address)) {
+                        player.moveBy(self.ticks, card.direction);
+                        self.ball.moveBy(self.ticks, card.direction);
+                        used = true;
+                    }
+                },
+            }
+        }
+        if (used) {
+            self.cards.items[card_index].used = true;
+            self.cards.items[card_index].moveTo(self.ticks, .{ .x = -300, .y = -300 }, 100);
+            self.resolveEffects();
+        } else {
+            self.cards.items[card_index].moveTo(self.ticks, self.cards.items[card_index].original_pos, 100);
+        }
+    }
+
+    fn resolveEffects(self: *Self) void {
+        c.debugPrint("resolving effects");
+        // if player goes within 1 block of opponent, they die, and level is fail.
+        for (self.players.items) |*player| {
+            if (player.team == .player) {
+                for (self.players.items) |*other| {
+                    if (other.team == .opponent) {
+                        const distance = player.address.distancei(other.address);
+                        if (distance <= 1) {
+                            // player.knocked_out = true;
+                            self.failed = true;
+                            other.swingAnimation();
+                            c.debugPrint("failed");
+                        }
+                    }
+                }
             }
         }
     }
@@ -431,6 +685,7 @@ const Field = struct {
             .idle => {
                 self.state.idle.card_index = null;
                 for (self.cards.items, 0..) |card, i| {
+                    if (card.used) continue;
                     if (card.rect.contains(mouse.current_pos)) self.state.idle.card_index = i;
                 }
                 if (mouse.l_button.is_clicked) {
@@ -463,7 +718,7 @@ const Field = struct {
                     if (self.state.card_drag.cell_index) |ci| {
                         self.maybePlayCard(self.state.card_drag.card_index, ci);
                     } else {
-                        self.cards.items[data.card_index].moveTo(self.ticks, .{}, 300);
+                        self.cards.items[data.card_index].moveTo(self.ticks, self.cards.items[data.card_index].original_pos, 100);
                     }
                     self.state = .{ .idle = .{} };
                 }
@@ -520,6 +775,12 @@ pub const Game = struct {
             if (self.field.players.items[0].address.equal(self.field.ball.address)) self.field.ball.moveBy(self.ticks, .{ .y = -1 });
             self.field.players.items[0].moveBy(self.ticks, .{ .y = -1 });
         }
+        if (self.haathi.inputs.getKey(.space).is_clicked) {
+            self.field.serialize();
+        }
+        if (self.haathi.inputs.getKey(.v).is_clicked) {
+            self.field.deserialize(LEVELS[0]);
+        }
     }
 
     pub fn render(self: *Self) void {
@@ -538,21 +799,33 @@ pub const Game = struct {
                 .sprite = sprite.sprite,
             });
         }
-        for (self.field.bg_sprites.items) |sprite| {
-            self.haathi.drawSprite(.{
-                .position = sprite.position,
-                .sprite = sprite.sprite,
-            });
+        if (true) {
+            for (self.field.bg_sprites.items) |sprite| {
+                self.haathi.drawSprite(.{
+                    .position = sprite.position,
+                    .sprite = sprite.sprite,
+                });
+            }
         }
-        for (self.field.cells.items) |cell| {
-            self.haathi.drawSprite(.{
-                .position = cell.position,
-                .sprite = cell.sprite,
-                .scale = .{ .x = CELL_WIDTH / cell.sprite.size.x, .y = CELL_HEIGHT / cell.sprite.size.y },
-            });
+        if (true) {
+            for (self.field.cells.items) |cell| {
+                const sprite = cell.sprites[0];
+                self.haathi.drawSprite(.{
+                    .position = cell.position.add(sprite.position),
+                    .sprite = sprite.sprite,
+                });
+            }
+            for (self.field.cells.items) |cell| {
+                for (cell.sprites[1..]) |sprite| {
+                    self.haathi.drawSprite(.{
+                        .position = cell.position.add(sprite.position),
+                        .sprite = sprite.sprite,
+                    });
+                }
+            }
         }
         // target
-        {
+        if (true) {
             const pos = self.field.getPosOf(self.field.target);
             for (sprites.TARGETS, sprites.TARGET_OFFSETS) |sprite, offset| {
                 self.haathi.drawSprite(.{
@@ -561,30 +834,51 @@ pub const Game = struct {
                 });
             }
         }
-        for (self.field.cards.items) |card| {
-            for (card.sprites) |sprite| {
-                self.haathi.drawSprite(.{
-                    .position = card.rect.position.add(sprite.position),
-                    .sprite = sprite.sprite,
-                    .scale = sprite.scale,
+        if (true) {
+            for (self.field.cards.items) |card| {
+                if (card.used) continue;
+                for (card.sprites) |sprite| {
+                    self.haathi.drawSprite(.{
+                        .position = card.rect.position.add(sprite.position),
+                        .sprite = sprite.sprite,
+                        .scale = sprite.scale,
+                    });
+                }
+                self.haathi.drawText(.{
+                    .text = card.text,
+                    .position = card.rect.position.add(card.rect.size.scale(0.5)).add(card.sprites[3].position),
+                    .color = Vec4{ .x = 1, .y = 1, .z = 1, .w = 1 },
                 });
             }
         }
-        for (self.field.players.items) |player| {
+        if (true) {
+            for (self.field.players.items) |player| {
+                self.haathi.drawSprite(.{
+                    .position = player.position.add(PLAYER_SPRITE_OFFSET),
+                    .sprite = player.sprite,
+                });
+            }
+        }
+        if (true) {
             self.haathi.drawSprite(.{
-                .position = player.position.add(PLAYER_SPRITE_OFFSET),
-                .sprite = player.sprite,
+                .position = self.field.ball.position,
+                .sprite = self.field.ball.sprite,
             });
         }
-        self.haathi.drawSprite(.{
-            .position = self.field.ball.position,
-            .sprite = self.field.ball.sprite,
-        });
-        if (mouse_pos.x != 0 and mouse_pos.y != 0) {
-            self.haathi.drawSprite(.{
-                .position = self.haathi.inputs.mouse.current_pos.add(POINTER_OFFSET),
-                .sprite = sprites.POINTER,
+        if (self.field.failed) {
+            self.haathi.drawText(.{
+                .text = "Level Failed",
+                .position = .{ .x = SCREEN_SIZE.x / 2, .y = 100 },
+                .color = colors.solarized_red,
             });
+        }
+        if (true) {
+            if (mouse_pos.x != 0 and mouse_pos.y != 0) {
+                self.haathi.drawSprite(.{
+                    .position = self.haathi.inputs.mouse.current_pos.add(POINTER_OFFSET),
+                    .sprite = sprites.POINTER,
+                });
+            }
         }
     }
 };

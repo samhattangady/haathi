@@ -21,10 +21,11 @@ pub const TERRAIN_SPRITES = [_]Sprite{
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 192, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 192, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 192, .y = 192 }, .size = .{ .x = 64, .y = 64 } },
-    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 256, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
-    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 256, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
-    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 256, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
-    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 256, .y = 192 }, .size = .{ .x = 64, .y = 64 } },
+    // sand
+    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 320, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 320, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 320, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 320, .y = 192 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 384, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 384, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 384, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
@@ -38,7 +39,7 @@ pub const TERRAIN_SPRITES = [_]Sprite{
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 512, .y = 128 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 512, .y = 192 }, .size = .{ .x = 64, .y = 64 } },
     // tufts
-    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 320, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+    .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 256, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 576, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
 };
 
@@ -54,6 +55,39 @@ pub fn terrain_grass(up: bool, down: bool, left: bool, right: bool) Sprite {
     const nr = !right;
     // so that we share with sand
     const base = 0;
+    // up border
+    if (iu and id and il and ir) return TERRAIN_SPRITES[base + 15];
+    if (iu and id and il and nr) return TERRAIN_SPRITES[base + 3];
+    if (iu and id and nl and ir) return TERRAIN_SPRITES[base + 11];
+    if (iu and id and nl and nr) return TERRAIN_SPRITES[base + 7];
+    if (iu and nd and il and ir) return TERRAIN_SPRITES[base + 12];
+    if (iu and nd and il and nr) return TERRAIN_SPRITES[base + 0];
+    if (iu and nd and nl and ir) return TERRAIN_SPRITES[base + 8];
+    if (iu and nd and nl and nr) return TERRAIN_SPRITES[base + 4];
+    // no up border
+    if (nu and id and il and ir) return TERRAIN_SPRITES[base + 14];
+    if (nu and id and il and nr) return TERRAIN_SPRITES[base + 2];
+    if (nu and id and nl and ir) return TERRAIN_SPRITES[base + 10];
+    if (nu and id and nl and nr) return TERRAIN_SPRITES[base + 6];
+    if (nu and nd and il and ir) return TERRAIN_SPRITES[base + 13];
+    if (nu and nd and il and nr) return TERRAIN_SPRITES[base + 1];
+    if (nu and nd and nl and ir) return TERRAIN_SPRITES[base + 9];
+    if (nu and nd and nl and nr) return TERRAIN_SPRITES[base + 5];
+    unreachable;
+}
+
+/// send in request where bool is whether the direction is an edge.
+pub fn terrain_sand(up: bool, down: bool, left: bool, right: bool) Sprite {
+    const iu = up;
+    const id = down;
+    const il = left;
+    const ir = right;
+    const nu = !up;
+    const nd = !down;
+    const nl = !left;
+    const nr = !right;
+    // so that we share with sand
+    const base = 16;
     // up border
     if (iu and id and il and ir) return TERRAIN_SPRITES[base + 15];
     if (iu and id and il and nr) return TERRAIN_SPRITES[base + 3];
@@ -189,6 +223,18 @@ pub fn red_player(moving: bool) [6]Sprite {
     };
 }
 
+pub fn player_swing() [6]Sprite {
+    const row = 2;
+    return [6]Sprite{
+        RED_PLAYER[row + 30],
+        RED_PLAYER[row + 24],
+        RED_PLAYER[row + 18],
+        RED_PLAYER[row + 12],
+        RED_PLAYER[row + 6],
+        RED_PLAYER[row + 0],
+    };
+}
+
 pub const TARGETS = [_]Sprite{
     .{ .path = "sprites/marker_1.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/marker_2.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
@@ -258,4 +304,10 @@ pub const BUTTONS = [_]Sprite{
     .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 64, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Button_Shadow.png", .anchor = .{ .x = 128, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
+};
+
+pub const ROCKS = Sprite{ .path = "sprites/Rocks.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } };
+
+pub const ELEVATION = [_]Sprite{
+    .{ .path = "sprites/Tilemap_Elevation.png", .anchor = .{ .x = 192, .y = 256 }, .size = .{ .x = 64, .y = 128 } },
 };
