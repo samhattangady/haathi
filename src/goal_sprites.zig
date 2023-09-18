@@ -4,6 +4,7 @@ const Sprite = @import("haathi.zig").Sprite;
 
 pub const BLANK = Sprite{ .path = "sprites/pointer.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 0, .y = 0 } };
 pub const POINTER = Sprite{ .path = "sprites/pointer.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } };
+pub const POINTER_RED = Sprite{ .path = "sprites/pointer_red.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } };
 pub const TERRAIN_SPRITES = [_]Sprite{
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 0, .y = 0 }, .size = .{ .x = 64, .y = 64 } },
     .{ .path = "sprites/Tilemap_Flat.png", .anchor = .{ .x = 0, .y = 64 }, .size = .{ .x = 64, .y = 64 } },
@@ -310,4 +311,15 @@ pub const ROCKS = Sprite{ .path = "sprites/Rocks.png", .anchor = .{ .x = 0, .y =
 
 pub const ELEVATION = [_]Sprite{
     .{ .path = "sprites/Tilemap_Elevation.png", .anchor = .{ .x = 192, .y = 256 }, .size = .{ .x = 64, .y = 128 } },
+};
+
+pub const ARROWS = [_]Sprite{
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 0 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 1 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 2 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 3 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 4 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 5 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 6 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
+    .{ .path = "sprites/arrows.png", .anchor = .{ .x = 7 * 24, .y = 0 }, .size = .{ .x = 24, .y = 24 } },
 };

@@ -1053,3 +1053,21 @@ the rock reflections is the best idea.
 Okay, for rocks, we need to check
 1. if ball hits it, and still has momentum, it should reflect. So the current
 rocks is not going to work. We need to implement it with elevation in mind.
+
+---
+
+17 Sep 2023:
+Okay its the last day. We need to be a little strict if we want to finish this
+whole thing. First thing is get the rock reflection mechanic working. Then set
+up the whole content system. I don't think we can have any more mechanics. So
+just those two and make the levels and things. Also set up level fails. All
+the conditions. Ball to opponent, same square as opponent. out of bounds.
+
+So first do the fail stuff.
+Cool. That's all done.
+
+Now we should work on the system of menus and progression.
+
+polish:
+- when hovered over a player that can't be played, highlight red.
+- when player kicks ball, play swing animation

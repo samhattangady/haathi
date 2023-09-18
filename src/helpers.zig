@@ -162,6 +162,10 @@ pub const Vec2i = struct {
         return v.x == v1.x and v.y == v1.y;
     }
 
+    pub fn scale(v: *const Self, t: i32) Self {
+        return .{ .x = v.x * t, .y = v.y * t };
+    }
+
     pub fn distancei(v: *const Self, v1: Self) i32 {
         const absx = std.math.absInt(v.x - v1.x) catch unreachable;
         const absy = std.math.absInt(v.y - v1.y) catch unreachable;
