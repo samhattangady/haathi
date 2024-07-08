@@ -68,7 +68,7 @@ pub const Haathi = struct {
 
     pub fn init() Self {
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        var allocator = std.heap.page_allocator;
+        const allocator = std.heap.page_allocator;
         return .{
             .drawables = std.ArrayList(Drawable).init(allocator),
             .allocator = allocator,

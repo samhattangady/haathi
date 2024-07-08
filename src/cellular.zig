@@ -114,7 +114,7 @@ const Rule = struct {
     allocator: std.mem.Allocator,
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .condition = std.ArrayList(Cell).init(allocator),
             .result = std.ArrayList(Cell).init(allocator),
             .buttons = std.ArrayList(Button).init(allocator),
@@ -324,7 +324,7 @@ const Zone = struct {
     height: usize = 2,
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .cells = std.ArrayList(Cell).init(allocator),
             .buttons = std.ArrayList(Button).init(allocator),
         };
@@ -901,35 +901,35 @@ const Board = struct {
     fn applyAction(self: *Self, action: BoardButtonAction) void {
         switch (action) {
             .add_rule => {
-                var rule = Rule.init(self.allocator);
+                const rule = Rule.init(self.allocator);
                 self.rules.append(rule) catch unreachable;
                 self.setupRulePositions();
             },
             .sub_rule => {
                 if (self.rules.items.len == 0) return;
-                var rule = self.rules.pop();
+                const rule = self.rules.pop();
                 rule.deinit();
                 self.setupRulePositions();
             },
             .add_zone => {
-                var zone = Zone.init(self.allocator);
+                const zone = Zone.init(self.allocator);
                 self.zones.append(zone) catch unreachable;
                 self.setupZonePositions();
             },
             .sub_zone => {
                 if (self.zones.items.len == 0) return;
-                var zone = self.zones.pop();
+                const zone = self.zones.pop();
                 zone.deinit();
                 self.setupZonePositions();
             },
             .add_target => {
-                var target = Zone.init(self.allocator);
+                const target = Zone.init(self.allocator);
                 self.targets.append(target) catch unreachable;
                 self.setupTargetPositions();
             },
             .sub_target => {
                 if (self.targets.items.len == 0) return;
-                var target = self.targets.pop();
+                const target = self.targets.pop();
                 target.deinit();
                 self.setupTargetPositions();
             },
@@ -975,7 +975,7 @@ const Board = struct {
 
     fn updateFromZone(self: *Self, zone: *const Zone) void {
         for (zone.cells.items, 0..) |cell, i| {
-            var board_cell_index = zone.target_index + (self.width * @divFloor(i, zone.width)) + (i % zone.width);
+            const board_cell_index = zone.target_index + (self.width * @divFloor(i, zone.width)) + (i % zone.width);
             self.cells.items[board_cell_index].cell = cell.cell;
         }
     }

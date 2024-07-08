@@ -887,17 +887,17 @@ const Intersection = struct {
     fn serialize(self: *const Self, arena: std.mem.Allocator) []const u8 {
         var str = std.ArrayList(u8).init(arena);
         for (self.cars.items) |car| {
-            var tok = car.serialize(arena);
+            const tok = car.serialize(arena);
             str.appendSlice(tok) catch unreachable;
             str.append(' ') catch unreachable;
         }
         for (self.signals.items) |sig| {
-            var tok = sig.serialize(arena);
+            const tok = sig.serialize(arena);
             str.appendSlice(tok) catch unreachable;
             str.append(' ') catch unreachable;
         }
         for (self.sensors.items) |sen| {
-            var tok = sen.serialize(arena);
+            const tok = sen.serialize(arena);
             str.appendSlice(tok) catch unreachable;
             str.append(' ') catch unreachable;
         }

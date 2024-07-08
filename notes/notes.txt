@@ -1071,3 +1071,10 @@ Now we should work on the system of menus and progression.
 polish:
 - when hovered over a player that can't be played, highlight red.
 - when player kicks ball, play swing animation
+
+
+<iframe frameborder="0"
+src="https://itch.io/embed/2266849?border_width=3&amp;bg_color=77B7A8&amp;fg_color=13152C&amp;link_color=EEE0AA&amp;border_color=60938E"
+width="556" height="171"><a
+href="https://chapliboy.itch.io/golden-goal">Golden Goal by
+chapliboy</a></iframe>

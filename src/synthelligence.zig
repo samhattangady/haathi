@@ -61,7 +61,7 @@ const TEXT_2_YOFF = COMPONENT_HEIGHT - 7;
 fn sineWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     var points: [DISPLAY_SIZE]f32 = undefined;
     for (0..DISPLAY_SIZE) |i| {
-        var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
+        const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
         points[i] = @sin(val);
     }
     return points;
@@ -70,7 +70,7 @@ fn sineWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
 fn cosWaveScaled(scale: f32) [DISPLAY_SIZE]f32 {
     var points: [DISPLAY_SIZE]f32 = undefined;
     for (0..DISPLAY_SIZE) |i| {
-        var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
+        const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2 * scale;
         points[i] = @cos(val);
     }
     return points;
@@ -90,66 +90,66 @@ fn stage(lvl: usize) WaveDisplay {
     switch (lvl) {
         0 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = (@sin(val));
             }
         },
         1 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
-                wave.points[i] = @fabs(@sin(val));
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = @abs(@sin(val));
             }
         },
         2 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
-                wave.points[i] = @fabs(@cos(val));
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = @abs(@cos(val));
             }
         },
         3 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = 0.5 + (@sin(val * 2) * 0.25);
             }
         },
         4 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
-                wave.points[i] = -0.5 + (@fabs(@cos(val * 2)) * -0.25);
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                wave.points[i] = -0.5 + (@abs(@cos(val * 2)) * -0.25);
             }
         },
         5 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = @max(t, @sin(val));
             }
         },
         6 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 wave.points[i] = (@sin(val) * (1 - t));
             }
         },
         7 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const sin = 2 * @sin(val * 2);
                 wave.points[i] = @min(@max(-1, sin), 1);
             }
         },
         8 => {
             for (0..DISPLAY_SIZE) |i| {
-                var t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const t = @as(f32, @floatFromInt(i)) / DISPLAY_SIZE;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const cos2t = @cos(val * 2);
                 wave.points[i] = @min(t, @max(cos2t, -t));
             }
         },
         9 => {
             for (0..DISPLAY_SIZE) |i| {
-                var val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
+                const val = (@as(f32, @floatFromInt(i)) / DISPLAY_SIZE) * std.math.pi * 2;
                 const cos2t = @cos(val * 2) * 0.5;
                 wave.points[i] = @max(@max(0, cos2t), @min(1, @cos(val) * 2));
             }
@@ -539,7 +539,7 @@ pub const Game = struct {
     pub fn init(haathi: *Haathi) Self {
         const allocator = haathi.allocator;
         var arena_handle = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-        var components = std.ArrayList(Component).init(allocator);
+        const components = std.ArrayList(Component).init(allocator);
         var buttons = std.ArrayList(ComponentButton).init(allocator);
         {
             const button_padding_y: f32 = (720 - (NUM_COMPONENT_ROWS * COMPONENT_HEIGHT)) / (NUM_COMPONENT_ROWS + 1);
@@ -580,7 +580,7 @@ pub const Game = struct {
         }
         slots.items[slots.items.len - 1].component_type = .output_main;
         slots.items[slots.items.len - 2].component_type = .display1;
-        var connections = std.ArrayList(Connection).init(allocator);
+        const connections = std.ArrayList(Connection).init(allocator);
         var controls = std.ArrayList(ControlButton).init(allocator);
         var text_y: f32 = 0;
         {
@@ -896,7 +896,7 @@ pub const Game = struct {
     }
 
     pub fn drawConnection(self: *Self, connection: Connection, active: bool) void {
-        var color = if (active) colors.solarized_base02 else colors.solarized_base0;
+        const color = if (active) colors.solarized_base02 else colors.solarized_base0;
         var path = std.ArrayList(Vec2).init(self.arena);
         const root = self.slots.items[connection.root].rect;
         const stem = self.slots.items[connection.stem].rect;
@@ -1037,7 +1037,7 @@ pub const Game = struct {
                 });
             }
         }
-        var hovered_button: ?usize = if (self.state == .idle) self.state.idle.hovered_button else null;
+        const hovered_button: ?usize = if (self.state == .idle) self.state.idle.hovered_button else null;
         for (self.buttons.items, 0..) |button, i| {
             if (hovered_button != null and hovered_button.? == i) {
                 self.haathi.drawRect(.{
@@ -1060,7 +1060,7 @@ pub const Game = struct {
                 .style = FONT_1,
             });
         }
-        var hovered_control: ?usize = if (self.state == .idle) self.state.idle.hovered_control else null;
+        const hovered_control: ?usize = if (self.state == .idle) self.state.idle.hovered_control else null;
         for (self.controls.items, 0..) |control, i| {
             if (hovered_control != null and hovered_control.? == i) {
                 self.haathi.drawRect(.{

@@ -845,32 +845,32 @@ const Field = struct {
     fn serialize(self: *Self) void {
         var string = std.ArrayList(u8).init(self.arena);
         {
-            var tok = std.fmt.allocPrint(self.arena, "size|{d}|{d}", .{ self.width, self.height }) catch unreachable;
+            const tok = std.fmt.allocPrint(self.arena, "size|{d}|{d}", .{ self.width, self.height }) catch unreachable;
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;
         }
         {
-            var tok = self.ball.serialize(self.arena);
+            const tok = self.ball.serialize(self.arena);
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;
         }
         {
-            var tok = std.fmt.allocPrint(self.arena, "target|{d}|{d}", .{ self.target.x, self.target.y }) catch unreachable;
+            const tok = std.fmt.allocPrint(self.arena, "target|{d}|{d}", .{ self.target.x, self.target.y }) catch unreachable;
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;
         }
         for (self.players.items) |player| {
-            var tok = player.serialize(self.arena);
+            const tok = player.serialize(self.arena);
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;
         }
         for (self.cards.items) |card| {
-            var tok = card.serialize(self.arena);
+            const tok = card.serialize(self.arena);
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;
         }
         for (self.cells.items) |cell| {
-            var tok = cell.serialize(self.arena);
+            const tok = cell.serialize(self.arena);
             if (tok.len == 0) continue;
             string.appendSlice(tok) catch unreachable;
             string.append(' ') catch unreachable;

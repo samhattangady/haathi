@@ -1602,7 +1602,7 @@ pub const Game = struct {
     }
 
     fn setupButtons(self: *Self) void {
-        var cell = Cell.initPos(CELL_BUTTON_CENTER, FULL_CELL_SCALE);
+        const cell = Cell.initPos(CELL_BUTTON_CENTER, FULL_CELL_SCALE);
         var slots: [6]Vec2 = undefined;
         for (cell.points, 0..) |p0, i| {
             const p1 = if (i == 5) cell.points[0] else cell.points[i + 1];

@@ -118,7 +118,7 @@ const Frame = struct {
     cumulative: ?usize = null,
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .shots = std.ArrayList(usize).init(allocator),
             .scores = std.ArrayList(?usize).init(allocator),
             .clears = std.ArrayList(bool).init(allocator),
@@ -140,7 +140,7 @@ const Scorecard = struct {
     frames: std.ArrayList(Frame),
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .frames = std.ArrayList(Frame).init(allocator),
         };
         return self;
@@ -421,7 +421,7 @@ const Phalanx = struct {
         // }
         for (0..4) |_| self.addPinRow();
         for (0..self.total_num_frames) |_| {
-            var frame = Frame.init(self.allocator);
+            const frame = Frame.init(self.allocator);
             self.scorecard.frames.append(frame) catch unreachable;
         }
         self.resetBall();
@@ -721,7 +721,7 @@ const Phalanx = struct {
     fn addFrame(self: *Self) void {
         if (self.total_num_frames > 12) return;
         self.total_num_frames += 1;
-        var frame = Frame.init(self.allocator);
+        const frame = Frame.init(self.allocator);
         self.scorecard.frames.append(frame) catch unreachable;
     }
 
@@ -794,7 +794,7 @@ const SelectEffects = struct {
     cards_to_select: usize = undefined,
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .cards = std.ArrayList(EffectCard).init(allocator),
             .start = .{
                 .rect = .{

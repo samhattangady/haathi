@@ -15,7 +15,7 @@ const FONT_TEX_HEIGHT = 512;
 const CODEPOINT = 65;
 const START_CODEPOINT = 32;
 const END_CODEPOINT = 32 + 96;
-const FONT_SIZE = 24;
+const FONT_SIZE = 36;
 const alpha = " .:ioVM@";
 const PADDING = 1;
 
@@ -140,7 +140,6 @@ pub fn main() !void {
     var stream = JsonStream.new(gpa.allocator());
     defer stream.deinit();
     var jser = stream.serializer();
-    jser.whitespace = std.json.StringifyOptions.Whitespace{ .indent = .{ .Space = 2 } };
     var js = &jser;
     try js.beginObject();
     {
@@ -154,19 +153,19 @@ pub fn main() !void {
             try js.beginObject();
             {
                 try js.objectField("x0");
-                try js.emitNumber(@as(f32, @floatFromInt(rect.x)) / FONT_TEX_WIDTH);
+                try js.write(@as(f32, @floatFromInt(rect.x)) / FONT_TEX_WIDTH);
                 try js.objectField("y0");
-                try js.emitNumber(@as(f32, @floatFromInt(rect.y)) / FONT_TEX_HEIGHT);
+                try js.write(@as(f32, @floatFromInt(rect.y)) / FONT_TEX_HEIGHT);
                 try js.objectField("w");
-                try js.emitNumber(rect.w - PADDING);
+                try js.write(rect.w - PADDING);
                 try js.objectField("h");
-                try js.emitNumber(rect.h - PADDING);
+                try js.write(rect.h - PADDING);
                 try js.objectField("xoff");
-                try js.emitNumber(bmp.xoff);
+                try js.write(bmp.xoff);
                 try js.objectField("yoff");
-                try js.emitNumber(bmp.yoff);
+                try js.write(bmp.yoff);
                 try js.objectField("xadvance");
-                try js.emitNumber(bmp.xadvance);
+                try js.write(bmp.xadvance);
             }
             try js.endObject();
         }
@@ -175,11 +174,11 @@ pub fn main() !void {
         try js.beginObject();
         {
             try js.objectField("width");
-            try js.emitNumber(FONT_TEX_WIDTH);
+            try js.write(FONT_TEX_WIDTH);
             try js.objectField("height");
-            try js.emitNumber(FONT_TEX_HEIGHT);
+            try js.write(FONT_TEX_HEIGHT);
             try js.objectField("data");
-            try js.emitString(encoded_string);
+            try js.write(encoded_string);
         }
         try js.endObject();
     }
@@ -196,10 +195,9 @@ pub fn main() !void {
     // }
 }
 
-const JSON_SERIALIZER_MAX_DEPTH = 32;
 pub const JsonWriter = std.io.Writer(*JsonStream, JsonStreamError, JsonStream.write);
 pub const JsonStreamError = error{JsonWriteError};
-pub const JsonSerializer = std.json.WriteStream(JsonWriter, JSON_SERIALIZER_MAX_DEPTH);
+pub const JsonSerializer = std.json.WriteStream(JsonWriter, .{ .checked_to_fixed_depth = 256 });
 pub const JsonStream = struct {
     const Self = @This();
     buffer: std.ArrayList(u8),
@@ -223,12 +221,19 @@ pub const JsonStream = struct {
         return bytes.len;
     }
 
+    // pub fn saveDataToFile(self: *Self, filepath: []const u8, allocator: std.mem.Allocator) !void {
+    //     // TODO (08 Dec 2021 sam): See whether we want to add a hash or base64 encoding
+    //     try helpers.writeFileContents(filepath, self.buffer.items, allocator);
+    //     if (false) {
+    //         helpers.debugPrint("saving to file {s}\n", .{filepath});
+    //     }
+    // }
     pub fn save_data_to_file(self: *Self, filepath: []const u8) !void {
         // TODO (08 Dec 2021 sam): See whether we want to add a hash or base64 encoding
         try write_file_contents(filepath, self.buffer.items);
     }
 
     pub fn serializer(self: *Self) JsonSerializer {
-        return std.json.writeStream(self.writer(), JSON_SERIALIZER_MAX_DEPTH);
+        return std.json.writeStream(self.writer(), .{});
     }
 };

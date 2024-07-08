@@ -232,7 +232,7 @@ const ThrowParams = struct {
         const max_height = @as(f32, @floatFromInt(self.height.power())) * HEIGHT_OFFSET;
         const range = self.target.powerf() * HAND_SLOT_OFFSET_AMOUNT;
         const y = @sqrt(2 * max_height * GRAVITY) * -1;
-        const x = (range * GRAVITY) / (2 * @fabs(y));
+        const x = (range * GRAVITY) / (2 * @abs(y));
         return .{ .x = dir * x, .y = y };
     }
 
@@ -343,7 +343,7 @@ const Track = struct {
     blocks: std.ArrayList(Block),
 
     pub fn init(allocator: std.mem.Allocator) Self {
-        var self = Self{
+        const self = Self{
             .rect = undefined,
             .slots = std.ArrayList(Rect).init(allocator),
             .blocks = std.ArrayList(Block).init(allocator),
@@ -1425,7 +1425,7 @@ pub const Game = struct {
                         .color = colors.endesga_grey4,
                         .radius = 10,
                     });
-                    var inst_i = std.fmt.allocPrintZ(self.arena, "{d}", .{hand.step_index}) catch unreachable;
+                    const inst_i = std.fmt.allocPrintZ(self.arena, "{d}", .{hand.step_index}) catch unreachable;
                     self.haathi.drawText(.{
                         .position = rect0.position.lerp(rect1.position, f).add(.{ .y = -6 }),
                         .text = inst_i,
