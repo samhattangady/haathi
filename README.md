@@ -7,6 +7,11 @@ Haathi is a simple game engine for zig and wasm.
 ## Example games:
 
 
+#### [and so we build](https://chapliboy.itch.io/and-so-we-build)
+A chill incremental game about building a grand monument - [source](https://github.com/samhattangady/mountain_core)
+
+![and so we build thumbnail](thumbnails/and_so_we_build.png)
+
 #### [Golden Goal](https://chapliboy.itch.io/golden-goal)
 Relive the story of the goal that won the championship - [source](https://github.com/samhattangady/haathi/blob/master/src/goal.zig)
 
